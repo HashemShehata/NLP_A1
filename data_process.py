@@ -102,7 +102,7 @@ def compare_dicts(train_dict,val_dict):
     keys_not_in_train = set(val_dict.keys()) - set(train_dict.keys())
     return keys_not_in_train
 
-train_set = read_file("../A1_DATASET/train.txt")
+train_set = read_file("A1_DATASET/train.txt")
 random.shuffle(train_set)
 
 #approx 102 samples
@@ -113,7 +113,7 @@ split_index = int(len(train_set) * val_ratio)
 val_df = train_set[:split_index]
 train_df = train_set[split_index:]
 
-test_df = read_file("../A1_DATASET/val.txt")
+test_df = read_file("A1_DATASET/val.txt")
 # print (len(val_df))
 # print (len(train_df))
 # print (len(test_df))
