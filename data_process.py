@@ -102,55 +102,8 @@ def compare_dicts(train_dict,val_dict):
     keys_not_in_train = set(val_dict.keys()) - set(train_dict.keys())
     return keys_not_in_train
 
-
-# new code thats added - hrishab 
-# Function to replace rare words with <unk> and build vocabulary
-def replace_rare_words_with_unk(reviews, threshold=1):
-    # Count word frequencies (excluding <s> and </s>)
-    word_counts = Counter(
-        token
-        for review in reviews
-        for token in nltk.word_tokenize(review.lower())
-        if token not in ("<s>", "</s>")
-    )
-    # Build vocabulary: words with frequency > threshold
-    vocab = {word for word, count in word_counts.items() if count > threshold}
-    vocab.update({"<s>", "</s>", "<unk>"})
-
-    # Replace rare words with <unk>
-    new_reviews = []
-    for review in reviews:
-        tokens = nltk.word_tokenize(review.lower())
-        new_tokens = [
-            token if token in vocab else "<unk>" for token in tokens
-        ]
-        new_reviews.append(" ".join(new_tokens))
-    return new_reviews, vocab
-
 train_set = read_file("A1_DATASET/train.txt")
 random.shuffle(train_set)
-
-# Replace rare words in train_set with <unk>
-train_set, vocab = replace_rare_words_with_unk(train_set, threshold=1)
-
-# Do the same for val_df and test_df using the train vocab
-val_df = read_file("A1_DATASET/val.txt")
-val_df = [
-    " ".join([
-        token if token in vocab else "<unk>"
-        for token in nltk.word_tokenize(review.lower())
-    ])
-    for review in val_df
-]
-
-test_df = read_file("A1_DATASET/val.txt")
-test_df = [
-    " ".join([
-        token if token in vocab else "<unk>"
-        for token in nltk.word_tokenize(review.lower())
-    ])
-    for review in test_df
-]
 
 #approx 102 samples
 val_ratio = 0.2  
@@ -160,7 +113,7 @@ split_index = int(len(train_set) * val_ratio)
 val_df = train_set[:split_index]
 train_df = train_set[split_index:]
 
-# test_df = read_file("A1_DATASET/val.txt")
+test_df = read_file("A1_DATASET/val.txt")
 # print (len(val_df))
 # print (len(train_df))
 # print (len(test_df))
