@@ -96,7 +96,46 @@ def build_k_smoothing(ngram_counts,k,vocab_size,ngram_context_counts=None):
             print (e)
             print (f"Context words are {context}")
             sys.exit(0)
-    return ngram_probs  
+    return ngram_probs
+
+# new code added by clowie: KN + stupid backoff smoothing
+def build_kneser_ney_smoothing(ngram_counts, vocab_size, ngram_context_counts=None, discount=0.75):
+    ngram_probs = dict()
+    
+    if ngram_context_counts is None:
+        total_ngrams = sum(ngram_counts.values())
+        context_count = total_ngrams
+    
+    for ngram, count in ngram_counts.items():
+        context = ngram[:-1]
+        if ngram_context_counts is not None:
+            if isinstance(ngram_context_counts, dict):
+                context_count = ngram_context_counts.get(context, 0)
+        ngram_probs[ngram] = max(count - discount, 0) / context_count  # simplified KN
+    return ngram_probs
+
+def build_stupid_backoff(ngram_counts, ngram_context_counts, alpha=0.4):
+    ngram_probs = dict()
+    total_unigrams = sum([c for n, c in ngram_counts.items() if len(n) == 1])
+
+    def sb_prob(ngram):
+        context = ngram[:-1]
+        # Check context only if ngram_context_counts is a dict
+        if isinstance(ngram_context_counts, dict):
+            context_count = ngram_context_counts.get(context, 0)
+        else:
+            context_count = 1  # dummy 1 to avoid zero division for unigrams
+
+        if ngram_counts.get(ngram, 0) > 0 and context_count > 0:
+            return ngram_counts[ngram] / context_count
+        else:
+            if len(ngram) == 1:
+                # fallback for unigram
+                return ngram_counts.get(ngram, 0) / sum(ngram_counts.values())
+            else:
+                # recursively backoff
+                return alpha * sb_prob(ngram[1:])
+
 
 def compare_dicts(train_dict,val_dict):
     keys_not_in_train = set(val_dict.keys()) - set(train_dict.keys())
@@ -197,12 +236,15 @@ test_bigram_counts = build_ngram(test_df, 2)
 # print (val_trigram_counts)
 test_unigram_counts = build_ngram(test_df, 1) 
 
+# smoothing technique applied
 unigram_probs = build_ngram_probabilities(unigram_counts)
 # print (unigram_probs)
 bigram_probs = build_ngram_probabilities(bigram_counts,unigram_counts)
 # print (bigram_probs)
 # trigram_probs = build_ngram_probabilities(trigram_counts,bigram_counts)
 # print (trigram_probs)
+
+# unsmoothing techniques applied: (1) laplace, (2) k-smoothing, (3) kneser-ney, (4) stupid backoff
 unigram_probs = build_ngram_laplace_smoothing(unigram_counts,vocabulary_size)
 # print (unigram_probs)
 bigram_probs = build_ngram_laplace_smoothing(bigram_counts,vocabulary_size,unigram_counts)
@@ -217,11 +259,23 @@ bigram_probs = build_k_smoothing(bigram_counts,0.5,vocabulary_size,unigram_count
 # trigram_probs = build_k_smoothing(trigram_counts,0.5,vocabulary_size,bigram_counts)
 # print (trigram_probs)
 
+unigram_probs = build_kneser_ney_smoothing(unigram_counts, vocabulary_size)
+# print (unigram_probs)
+bigram_probs = build_kneser_ney_smoothing(bigram_counts, vocabulary_size, unigram_counts)
+# print (bigram_probs)
+# trigram_probs = build_kneser_ney_smoothing(trigram_counts, vocabulary_size, bigram_counts)
+# print (trigram_probs)
+
+unigram_probs = build_stupid_backoff(unigram_counts, vocabulary_size)
+# print (unigram_probs)
+bigram_probs = build_stupid_backoff(bigram_counts, vocabulary_size, unigram_counts)
+# print (bigram_probs)
+# trigram_probs = build_stupid_backoff(trigram_counts, vocabulary_size, bigram_counts)\
+# print (trigram_probs)
+
 # print (",..................................\n\n")
 # unigram_keys_not_in_train = compare_dicts(unigram_counts,val_unigram_counts)
 # print (unigram_keys_not_in_train)
 # bigram_keys_not_in_train = compare_dicts(bigram_counts,val_bigram_counts)
 # print (bigram_keys_not_in_train)
 # sys.exit(0)
-
-
