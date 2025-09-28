@@ -1,3 +1,48 @@
+# --- Kneser-Ney and Stupid Backoff Smoothing for Bigrams ---
+def build_kneser_ney_bigram_probs(bigram_counts, unigram_counts, discount=0.75):
+    # Collect continuation counts
+    continuation_counts = Counter()
+    for (w1, w2) in bigram_counts:
+        continuation_counts[w2] += 1
+    total_bigrams = sum(bigram_counts.values())
+    total_unigrams = sum(unigram_counts.values())
+    unique_bigrams = len(bigram_counts)
+    unique_continuations = len(continuation_counts)
+
+    # Precompute lambdas for each context
+    lambdas = {}
+    for (w1,) in unigram_counts:
+        n_continuations = len([w2 for (ww1, w2) in bigram_counts if ww1 == w1])
+        lambdas[w1] = (discount * n_continuations) / unigram_counts[(w1,)] if unigram_counts[(w1,)] > 0 else 0.0
+
+    # Precompute continuation probabilities
+    p_continuation = {w2: continuation_counts[w2] / unique_bigrams for w2 in continuation_counts}
+
+    def kn_prob(w1, w2):
+        bigram = (w1, w2)
+        c_bigram = bigram_counts.get(bigram, 0)
+        c_w1 = unigram_counts.get((w1,), 0)
+        lambda_w1 = lambdas.get(w1, 0.0)
+        p_cont = p_continuation.get(w2, 1e-8)
+        if c_w1 > 0:
+            return max(c_bigram - discount, 0) / c_w1 + lambda_w1 * p_cont
+        else:
+            return p_cont
+    return kn_prob
+
+def build_stupid_backoff_bigram_probs(bigram_counts, unigram_counts, alpha=0.4):
+    total_unigrams = sum(unigram_counts.values())
+    def sb_prob(w1, w2):
+        bigram = (w1, w2)
+        c_bigram = bigram_counts.get(bigram, 0)
+        c_w1 = unigram_counts.get((w1,), 0)
+        if c_bigram > 0 and c_w1 > 0:
+            return c_bigram / c_w1
+        else:
+            # Backoff to unigram
+            c_w2 = unigram_counts.get((w2,), 0)
+            return alpha * (c_w2 / total_unigrams if total_unigrams > 0 else 1e-8)
+    return sb_prob
 
 import pandas as pd
 from collections import defaultdict,Counter
@@ -100,7 +145,45 @@ def build_k_smoothing(ngram_counts,k,vocab_size,ngram_context_counts=None):
             print (e)
             print (f"Context words are {context}")
             sys.exit(0)
-    return ngram_probs  
+    return ngram_probs
+
+# new code added by clowie: KN + stupid backoff smoothing
+def build_kneser_ney_smoothing(ngram_counts, vocab_size, ngram_context_counts=None, discount=0.75):
+    ngram_probs = dict()
+    
+    if ngram_context_counts is None:
+        total_ngrams = sum(ngram_counts.values())
+        context_count = total_ngrams
+    
+    for ngram, count in ngram_counts.items():
+        context = ngram[:-1]
+        if ngram_context_counts is not None:
+            if isinstance(ngram_context_counts, dict):
+                context_count = ngram_context_counts.get(context, 0)
+        ngram_probs[ngram] = max(count - discount, 0) / context_count  # simplified KN
+    return ngram_probs
+
+def build_stupid_backoff(ngram_counts, ngram_context_counts, alpha=0.4):
+    ngram_probs = dict()
+    total_unigrams = sum([c for n, c in ngram_counts.items() if len(n) == 1])
+
+    def sb_prob(ngram):
+        context = ngram[:-1]
+        # Check context only if ngram_context_counts is a dict
+        if isinstance(ngram_context_counts, dict):
+            context_count = ngram_context_counts.get(context, 0)
+        else:
+            context_count = 1  # dummy 1 to avoid zero division for unigrams
+
+        if ngram_counts.get(ngram, 0) > 0 and context_count > 0:
+            return ngram_counts[ngram] / context_count
+        else:
+            if len(ngram) == 1:
+                # fallback for unigram
+                return ngram_counts.get(ngram, 0) / sum(ngram_counts.values())
+            else:
+                # recursively backoff
+                return alpha * sb_prob(ngram[1:])
 
 def compare_dicts(train_dict,val_dict):
     keys_not_in_train = set(val_dict.keys()) - set(train_dict.keys())
@@ -190,15 +273,19 @@ import math
 def calculate_perplexity(test_tokenized, ngram_probs, n, unk_token='<unk>'):
     N = 0
     log_prob_sum = 0.0
+    is_func = callable(ngram_probs)
     for tokens in test_tokenized:
         for i in range(len(tokens) - n + 1):
             ngram = tuple(tokens[i:i+n])
-            prob = ngram_probs.get(ngram)
+            if is_func:
+                # For Kneser-Ney or Stupid Backoff
+                prob = ngram_probs(*ngram)
+            else:
+                prob = ngram_probs.get(ngram)
             if prob is None or prob == 0:
-                # If ngram not found, use <unk> for unigram, or assign small prob for bigram
                 if n == 1:
                     ngram = (unk_token,)
-                    prob = ngram_probs.get(ngram, 1e-8)
+                    prob = ngram_probs.get(ngram, 1e-8) if not is_func else 1e-8
                 else:
                     prob = 1e-8
             log_prob_sum += math.log(prob)
@@ -252,7 +339,12 @@ test_tokenized_bigram = tokenize_reviews_for_eval(test_df, 2)
 
 
 # --- Perplexity calculations ---
+# --- Perplexity calculations ---
 print("\n--- Perplexity Results ---")
+
+# Kneser-Ney and Stupid Backoff bigram probability functions
+kn_bigram_prob = build_kneser_ney_bigram_probs(bigram_counts, unigram_counts)
+sb_bigram_prob = build_stupid_backoff_bigram_probs(bigram_counts, unigram_counts)
 
 # No smoothing
 unigram_probs_nosmooth = build_ngram_probabilities(unigram_counts)
@@ -278,6 +370,12 @@ val_perp_bi_k = calculate_perplexity(val_tokenized_bigram, bigram_probs_k, 2)
 print(f"Validation Unigram Perplexity (k=0.5): {val_perp_uni_k:.2f}")
 print(f"Validation Bigram Perplexity (k=0.5): {val_perp_bi_k:.2f}")
 
+# Kneser-Ney and Stupid Backoff Perplexity (Validation)
+val_perp_bi_kn = calculate_perplexity(val_tokenized_bigram, kn_bigram_prob, 2)
+val_perp_bi_sb = calculate_perplexity(val_tokenized_bigram, sb_bigram_prob, 2)
+print(f"Validation Bigram Perplexity (Kneser-Ney): {val_perp_bi_kn:.2f}")
+print(f"Validation Bigram Perplexity (Stupid Backoff): {val_perp_bi_sb:.2f}")
+
 print("\n--- Test Set Perplexity Results ---")
 
 # Test set perplexity (optional, can comment out if not needed)
@@ -293,6 +391,12 @@ print(f"Test Unigram Perplexity (Laplace): {test_perp_uni_laplace:.2f}")
 print(f"Test Bigram Perplexity (Laplace): {test_perp_bi_laplace:.2f}")
 print(f"Test Unigram Perplexity (k=0.5): {test_perp_uni_k:.2f}")
 print(f"Test Bigram Perplexity (k=0.5): {test_perp_bi_k:.2f}")
+
+# Kneser-Ney and Stupid Backoff Perplexity (Test)
+test_perp_bi_kn = calculate_perplexity(test_tokenized_bigram, kn_bigram_prob, 2)
+test_perp_bi_sb = calculate_perplexity(test_tokenized_bigram, sb_bigram_prob, 2)
+print(f"Test Bigram Perplexity (Kneser-Ney): {test_perp_bi_kn:.2f}")
+print(f"Test Bigram Perplexity (Stupid Backoff): {test_perp_bi_sb:.2f}")
 
 
 
