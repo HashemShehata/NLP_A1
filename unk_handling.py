@@ -1,4 +1,4 @@
-
+from data_tokenization import tokenize_switch
 
 def replace_rare_with_unk_tokenized(sentences, rare_tokens, n):
     tokenized_reviews = []
