@@ -6,6 +6,7 @@ import random
 random.seed(42)
 import sys
 import math
+import os
 
 def read_file(filename):
     try:
@@ -196,45 +197,47 @@ def calculate_perplexity(test_ngram_counts, ngram_probs, training_counts=None, c
     
     return perplexity
 
-train_set = read_file("A1_DATASET/train.txt")
-random.shuffle(train_set)
+def write_to_file(data,filename):
+    with open(filename, "w", encoding="utf-8") as f:
+        if isinstance(data, Counter):
+            sorted_counter = sorted(data.items(),key=lambda x:x[1],reverse=True)
+            for item in sorted_counter:
+                f.write(f"{item[0]}: {item[1]}\n")
+        else:
+            for d in data:
+                f.write(d + "\n")
 
-#approx 102 samples
-val_ratio = 0.2  
-split_index = int(len(train_set) * val_ratio)
-# print (split_index)
-# print (train_set[:split_index])
-val_df = train_set[:split_index]
-train_df = train_set[split_index:]
+base_directory = "A1_DATASET/"
+if not os.path.exists(f"{base_directory}dev_split_20.txt"):
+    train_set = read_file(f"{base_directory}train.txt")
+    random.shuffle(train_set)
 
-test_df = read_file("A1_DATASET/val.txt")
-# print (len(val_df))
-# print (len(train_df))
-# print (len(test_df))
+    #approx 102 samples
+    val_ratio = 0.2  
+    split_index = int(len(train_set) * val_ratio)
+    val_df = train_set[:split_index]
+    train_df = train_set[split_index:]
+
+    write_to_file(train_df,f"{base_directory}train_split_80.txt")
+    write_to_file(val_df,f"{base_directory}dev_split_20.txt")
+
+else:
+    print ("Reading directly")
+    train_df = read_file(f"{base_directory}train_split_80.txt")
+    val_df = read_file(f"{base_directory}dev_split_20.txt")
+    
+test_df = read_file(f"{base_directory}val.txt")
 
 # Example usage
 unigram_counts = build_ngram(train_df, 1, is_training=True, unk_threshold=1) 
 bigram_counts = build_ngram(train_df, 2, is_training=False, training_vocab=unigram_counts) 
-# print (bigram_counts)
-# print (unigram_counts)
+
 vocabulary_size = len(set(unigram_counts.keys()))
-print (vocabulary_size)
 
-sorted_counter = sorted(unigram_counts.items(),key=lambda x:x[1],reverse=True)
-with open("output_unigram_counts.txt", "w") as f:
-    # for key, value in my_dict.items():
-        # f.write(f"{key}: {value}\n")=
-    for item in sorted_counter:
-        # print (item[0])
-        f.write(f"{item[0]}: {item[1]}\n")
+write_to_file(unigram_counts,"output_unigram_counts.txt")
+write_to_file(bigram_counts,"output_bigram_counts.txt")
 
-sortedbigram_counter = sorted(bigram_counts.items(),key=lambda x:x[1],reverse=True)
-with open("output_bigram_counts.txt", "w") as f:
-    # for key, value in my_dict.items():
-        # f.write(f"{key}: {value}\n")=
-    for item in sortedbigram_counter:
-        # print (item[0])
-        f.write(f"{item[0]}: {item[1]}\n")
+sys.exit(0)
 
 # For validation and test get the ngrams only as their prob will be fetched from train
 val_bigram_counts = build_ngram(val_df, 2, is_training=False, training_vocab=unigram_counts) 
