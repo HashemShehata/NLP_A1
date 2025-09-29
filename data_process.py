@@ -6,7 +6,6 @@ import random
 random.seed(42)
 import sys
 import math
-import os
 
 def read_file(filename):
     try:
@@ -19,57 +18,6 @@ def read_file(filename):
     
 def n_count(tokens, n):
     return Counter(tuple(tokens[i:i+n]) for i in range(len(tokens) - n + 1))
-
-
-def build_ngram(df, n, is_training=False, unk_threshold=1, training_vocab=None):
-    ngram_counts = Counter()
-
-    for review in df:
-        tokenized_sentences = tokenize(review,n)
-        
-        # For validation/test: replace unknown tokens with <UNK>
-        if not is_training and training_vocab is not None:
-            tokenized_sentences = replace_unknown_tokens(tokenized_sentences, training_vocab)
-        
-        # print (tokenized_sentences)
-        tokens_count = Counter(tuple(tokenized_sentences[i:i+n]) for i in range(len(tokenized_sentences) - n + 1))
-        ngram_counts.update(tokens_count)
-    
-    # Post-process: replace low-frequency n-grams with <UNK> versions (only for training)
-    if is_training:
-        ngram_counts = replace_low_freq_with_unk(ngram_counts, n, unk_threshold)
-    
-    return ngram_counts
-
-def replace_low_freq_with_unk(ngram_counts, n, unk_threshold):
-    """Replace low-frequency n-grams with <UNK> versions"""
-    updated_counts = Counter()
-    
-    for ngram, count in ngram_counts.items():
-        if count <= unk_threshold:
-            # Replace low-frequency n-grams with <UNK> versions
-            unk_ngram = tuple('<UNK>' if token not in ['<s>', '</s>'] else token for token in ngram)
-            updated_counts[unk_ngram] += count
-        else:
-            # Keep high-frequency n-grams as they are
-            updated_counts[ngram] = count
-    
-    return updated_counts
-
-def replace_unknown_tokens(tokenized_sentences, training_vocab):
-    """Replace tokens not in training vocabulary with <UNK>"""
-    updated_tokens = []
-    for token in tokenized_sentences:
-        if token in ['<s>', '</s>']:
-            # Keep special tokens as they are
-            updated_tokens.append(token)
-        elif (token,) in training_vocab:
-            # Keep known tokens
-            updated_tokens.append(token)
-        else:
-            # Replace unknown tokens with <UNK>
-            updated_tokens.append('<UNK>')
-    return updated_tokens
 
 def tokenize(text,n):
 
@@ -85,6 +33,19 @@ def tokenize(text,n):
         tokenized_sentences.extend(final_tokens)
 
     return tokenized_sentences
+
+
+def build_ngram(df, n):
+    ngram_counts = Counter()
+
+    for review in df:
+        tokenized_sentences = tokenize(review,n)
+        # print (tokenized_sentences)
+        tokens_count = Counter(tuple(tokenized_sentences[i:i+n]) for i in range(len(tokenized_sentences) - n + 1))
+        ngram_counts.update(tokens_count)
+    return ngram_counts
+
+
 
 def build_ngram_probabilities(ngram_counts,ngram_context_counts=None):
     ngram_probs = dict()
@@ -115,13 +76,13 @@ def build_ngram_laplace_smoothing(ngram_counts,vocab_size,ngram_context_counts=N
             # For unigrams, use total corpus size as context
             total_ngrams = sum(ngram_counts.values())
             context_count = total_ngrams
-        try:    
+        try:
             ngram_probs[ngram] = (count+1) / (context_count+vocab_size)
         except Exception as e:
             print (e)
             print (f"Context words are {context}")
             sys.exit(0)
-    return ngram_probs
+    return ngram_probs 
 
 def build_k_smoothing(ngram_counts,k,vocab_size,ngram_context_counts=None):
     ngram_probs = dict()
@@ -134,265 +95,311 @@ def build_k_smoothing(ngram_counts,k,vocab_size,ngram_context_counts=None):
             # For unigrams, use total corpus size as context
             total_ngrams = sum(ngram_counts.values())
             context_count = total_ngrams
-        try:    
+        try:
             ngram_probs[ngram] = (count+k) / (context_count+k*vocab_size)
         except Exception as e:
             print (e)
             print (f"Context words are {context}")
             sys.exit(0)
-    return ngram_probs  
+    return ngram_probs
+
+# new code added by clowie: KN + stupid backoff smoothing
+def build_kneser_ney_smoothing(ngram_counts, vocab_size, ngram_context_counts=None, discount=0.75):
+    ngram_probs = dict()
+    
+    if ngram_context_counts is None:
+        total_ngrams = sum(ngram_counts.values())
+        context_count = total_ngrams
+    
+    for ngram, count in ngram_counts.items():
+        context = ngram[:-1]
+        if ngram_context_counts is not None:
+            if isinstance(ngram_context_counts, dict):
+                context_count = ngram_context_counts.get(context, 0)
+        ngram_probs[ngram] = max(count - discount, 0) / context_count  # simplified KN
+    return ngram_probs
+
+def build_stupid_backoff(ngram_counts, ngram_context_counts, alpha=0.4):
+    ngram_probs = dict()
+    total_unigrams = sum([c for n, c in ngram_counts.items() if len(n) == 1])
+
+    def sb_prob(ngram):
+        context = ngram[:-1]
+        # Check context only if ngram_context_counts is a dict
+        if isinstance(ngram_context_counts, dict):
+            context_count = ngram_context_counts.get(context, 0)
+        else:
+            context_count = 1  # dummy 1 to avoid zero division for unigrams
+
+        if ngram_counts.get(ngram, 0) > 0 and context_count > 0:
+            return ngram_counts[ngram] / context_count
+        else:
+            if len(ngram) == 1:
+                # fallback for unigram
+                return ngram_counts.get(ngram, 0) / sum(ngram_counts.values())
+            else:
+                # recursively backoff
+                return alpha * sb_prob(ngram[1:])
+            
+# --- Kneser-Ney and Stupid Backoff Smoothing for Bigrams ---
+def build_kneser_ney_bigram_probs(bigram_counts, unigram_counts, discount=0.75):
+    # Collect continuation counts
+    continuation_counts = Counter()
+    for (w1, w2) in bigram_counts:
+        continuation_counts[w2] += 1
+    total_bigrams = sum(bigram_counts.values())
+    total_unigrams = sum(unigram_counts.values())
+    unique_bigrams = len(bigram_counts)
+    unique_continuations = len(continuation_counts)
+
+    # Precompute lambdas for each context
+    lambdas = {}
+    for (w1,) in unigram_counts:
+        n_continuations = len([w2 for (ww1, w2) in bigram_counts if ww1 == w1])
+        lambdas[w1] = (discount * n_continuations) / unigram_counts[(w1,)] if unigram_counts[(w1,)] > 0 else 0.0
+
+    # Precompute continuation probabilities
+    p_continuation = {w2: continuation_counts[w2] / unique_bigrams for w2 in continuation_counts}
+
+    def kn_prob(w1, w2):
+        bigram = (w1, w2)
+        c_bigram = bigram_counts.get(bigram, 0)
+        c_w1 = unigram_counts.get((w1,), 0)
+        lambda_w1 = lambdas.get(w1, 0.0)
+        p_cont = p_continuation.get(w2, 1e-8)
+        if c_w1 > 0:
+            return max(c_bigram - discount, 0) / c_w1 + lambda_w1 * p_cont
+        else:
+            return p_cont
+    return kn_prob
+
+def build_stupid_backoff_bigram_probs(bigram_counts, unigram_counts, alpha=0.4):
+    total_unigrams = sum(unigram_counts.values())
+    def sb_prob(w1, w2):
+        bigram = (w1, w2)
+        c_bigram = bigram_counts.get(bigram, 0)
+        c_w1 = unigram_counts.get((w1,), 0)
+        if c_bigram > 0 and c_w1 > 0:
+            return c_bigram / c_w1
+        else:
+            # Backoff to unigram
+            c_w2 = unigram_counts.get((w2,), 0)
+            return alpha * (c_w2 / total_unigrams if total_unigrams > 0 else 1e-8)
+    return sb_prob
 
 def compare_dicts(train_dict,val_dict):
     keys_not_in_train = set(val_dict.keys()) - set(train_dict.keys())
     return keys_not_in_train
 
-def calculate_perplexity(test_ngram_counts, ngram_probs, training_counts=None, context_counts=None, vocab_size=None, smoothing_type="none", k=0.5):
-    log_prob_sum = 0
-    total_ngrams = 0
-    
-    for ngram, count in test_ngram_counts.items():
-        # Try to get probability from pre-calculated probabilities
-        prob = ngram_probs.get(ngram, 0)
-        
-        # If probability is 0 (unseen n-gram), calculate smoothed probability
-        if prob == 0 and smoothing_type != "none":
-            if smoothing_type == "laplace":
-                # Laplace smoothing: (0 + 1) / (context_count + vocab_size)
-                context = ngram[:-1] if len(ngram) > 1 else ()
-                if context_counts is not None:
-                    context_count = context_counts.get(context, 0)
-                else:
-                    context_count = sum(training_counts.values()) if training_counts else 1
-                prob = 1 / (context_count + vocab_size)
-                
-            elif smoothing_type == "k_smoothing":
-                # k-smoothing: (0 + k) / (context_count + k*vocab_size)  
-                context = ngram[:-1] if len(ngram) > 1 else ()
-                if context_counts is not None:
-                    context_count = context_counts.get(context, 0)
-                else:
-                    context_count = sum(training_counts.values()) if training_counts else 1
-                prob = k / (context_count + k * vocab_size)
-        
-        if prob > 0:
-            log_prob_sum += count * math.log2(prob)
-        else:
-            # Handle zero probability 
-            if smoothing_type == "none":
-                # For no smoothing, zero probabilities are expected - use small epsilon
-                log_prob_sum += count * math.log2(1e-10)
-            else:
-                # For smoothing methods, this shouldn't happen - show warning
-                print(f"Warning: Zero probability for n-gram {ngram} with {smoothing_type} smoothing")
-                log_prob_sum += count * math.log2(1e-10)
-        
-        total_ngrams += count
-    
-    # Calculate perplexity: 2^(-1/N * sum(log2(p)))
-    if total_ngrams == 0:
-        return float('inf')
-    
-    avg_log_prob = log_prob_sum / total_ngrams
-    perplexity = 2 ** (-avg_log_prob)
-    
-    return perplexity
 
-def write_to_file(data,filename):
-    with open(filename, "w", encoding="utf-8") as f:
-        if isinstance(data, Counter):
-            sorted_counter = sorted(data.items(),key=lambda x:x[1],reverse=True)
-            for item in sorted_counter:
-                f.write(f"{item[0]}: {item[1]}\n")
-        else:
-            for d in data:
-                f.write(d + "\n")
+# --- Handle unknowns: replace all tokens with freq=1 in training data with <unk> ---
+train_set = read_file("A1_DATASET/train.txt")
+random.shuffle(train_set)
 
-base_directory = "A1_DATASET/"
-if not os.path.exists(f"{base_directory}dev_split_20.txt"):
-    train_set = read_file(f"{base_directory}train.txt")
-    random.shuffle(train_set)
+# Split train/val
+val_ratio = 0.2  
+split_index = int(len(train_set) * val_ratio)
+val_df = train_set[:split_index]
+train_df = train_set[split_index:]
 
-    #approx 102 samples
-    val_ratio = 0.2  
-    split_index = int(len(train_set) * val_ratio)
-    val_df = train_set[:split_index]
-    train_df = train_set[split_index:]
+# First pass: get unigram counts
+raw_unigram_counts = build_ngram(train_df, 1)
 
-    write_to_file(train_df,f"{base_directory}train_split_80.txt")
-    write_to_file(val_df,f"{base_directory}dev_split_20.txt")
+# Find tokens with freq=1
+rare_tokens = set([token for token, count in raw_unigram_counts.items() if count == 2])
 
-else:
-    print ("Reading directly")
-    train_df = read_file(f"{base_directory}train_split_80.txt")
-    val_df = read_file(f"{base_directory}dev_split_20.txt")
-    
-test_df = read_file(f"{base_directory}val.txt")
 
-# Example usage
-unigram_counts = build_ngram(train_df, 1, is_training=True, unk_threshold=1) 
-bigram_counts = build_ngram(train_df, 2, is_training=False, training_vocab=unigram_counts) 
+
+# --- Tokenization mode switch ---
+TOKENIZATION_MODE = 'byte'  # 'word' or 'byte'
+
+def byte_tokenize(text, n):
+    # Tokenize text into bytes, return list of byte strings
+    text_bytes = text.encode('utf-8')
+    # For n-gram, treat each byte as a token (as int or as byte string)
+    return [str(b) for b in text_bytes]
+
+def tokenize_switch(text, n):
+    if TOKENIZATION_MODE == 'word':
+        return tokenize(text, n)
+    elif TOKENIZATION_MODE == 'byte':
+        return byte_tokenize(text, n)
+    else:
+        raise ValueError('Unknown tokenization mode')
+
+# Replace rare tokens in tokenized lists, not as joined strings
+def replace_rare_with_unk_tokenized(sentences, rare_tokens, n):
+    tokenized_reviews = []
+    for review in sentences:
+        tokens = tokenize_switch(review, n)
+        new_tokens = ["<unk>" if (token,) in rare_tokens else token for token in tokens]
+        tokenized_reviews.append(new_tokens)
+    return tokenized_reviews
+
+
+# Replace rare tokens in train_df for unigrams (tokenized)
+train_tokenized_unk = replace_rare_with_unk_tokenized(train_df, rare_tokens, 1)
+
+# Rebuild ngram counts with <unk> using tokenized lists
+def build_ngram_from_tokenized(tokenized_reviews, n):
+    ngram_counts = Counter()
+    for tokens in tokenized_reviews:
+        ngram_counts.update(tuple(tokens[i:i+n]) for i in range(len(tokens) - n + 1))
+    return ngram_counts
+
+unigram_counts = build_ngram_from_tokenized(train_tokenized_unk, 1)
+bigram_counts = build_ngram_from_tokenized(train_tokenized_unk, 2)
+# trigram_counts = build_ngram_from_tokenized(train_tokenized_unk, 3)
 
 vocabulary_size = len(set(unigram_counts.keys()))
-
-write_to_file(unigram_counts,"output_unigram_counts.txt")
-write_to_file(bigram_counts,"output_bigram_counts.txt")
-
-sys.exit(0)
-
-# For validation and test get the ngrams only as their prob will be fetched from train
-val_bigram_counts = build_ngram(val_df, 2, is_training=False, training_vocab=unigram_counts) 
-# print (val_bigram_counts)
-val_unigram_counts = build_ngram(val_df, 1, is_training=False, training_vocab=unigram_counts) 
-# print (val_unigram_counts)
-test_bigram_counts = build_ngram(test_df, 2, is_training=False, training_vocab=unigram_counts) 
-test_unigram_counts = build_ngram(test_df, 1, is_training=False, training_vocab=unigram_counts) 
-
-unigram_probs = build_ngram_probabilities(unigram_counts)
-# print (unigram_probs)
-bigram_probs = build_ngram_probabilities(bigram_counts,unigram_counts)
-# print (bigram_probs)
-unigram_probs = build_ngram_laplace_smoothing(unigram_counts,vocabulary_size)
-# print (unigram_probs)
-bigram_probs = build_ngram_laplace_smoothing(bigram_counts,vocabulary_size,unigram_counts)
-# print (bigram_probs)
-
-unigram_probs = build_k_smoothing(unigram_counts,0.5,vocabulary_size)
-# print (unigram_probs)
-bigram_probs = build_k_smoothing(bigram_counts,0.5,vocabulary_size,unigram_counts)
-# print (bigram_probs)
+print(vocabulary_size)
 
 
-# Unigram probabilities with different smoothing methods
-unigram_probs_no_smooth = build_ngram_probabilities(unigram_counts)
+# Output unigram counts
+sorted_unigram_counter = sorted(unigram_counts.items(), key=lambda x: x[1], reverse=True)
+with open("output_unigram_counts.txt", "w") as f:
+    for item in sorted_unigram_counter:
+        f.write(f"{item[0]}: {item[1]}\n")
+
+# Output bigram counts
+sorted_bigram_counter = sorted(bigram_counts.items(), key=lambda x: x[1], reverse=True)
+with open("output_bigram_counts.txt", "w") as f:
+    for item in sorted_bigram_counter:
+        f.write(f"{item[0]}: {item[1]}\n")
+
+
+
+# --- Perplexity calculation functions ---
+import math
+
+def calculate_perplexity(test_tokenized, ngram_probs, n, unk_token='<unk>'):
+    N = 0
+    log_prob_sum = 0.0
+    is_func = callable(ngram_probs)
+    for tokens in test_tokenized:
+        for i in range(len(tokens) - n + 1):
+            ngram = tuple(tokens[i:i+n])
+            if is_func:
+                # For Kneser-Ney or Stupid Backoff
+                prob = ngram_probs(*ngram)
+            else:
+                prob = ngram_probs.get(ngram)
+            if prob is None or prob == 0:
+                if n == 1:
+                    ngram = (unk_token,)
+                    prob = ngram_probs.get(ngram, 1e-8) if not is_func else 1e-8
+                else:
+                    prob = 1e-8
+            log_prob_sum += math.log(prob)
+            N += 1
+    perplexity = math.exp(-log_prob_sum / N) if N > 0 else float('inf')
+    return perplexity
+
+def tokenize_reviews_for_eval(reviews, n):
+    return [tokenize_switch(review, n) for review in reviews]
+
+# Read test set before tokenization
+test_df = read_file("A1_DATASET/val.txt")
+
+
+# Build set of known tokens (training vocab, after <unk> replacement)
+train_vocab = set(token for (token,), count in unigram_counts.items())
+
+# Function to replace OOV tokens with <unk> in tokenized data
+def replace_oov_with_unk(tokenized_reviews, train_vocab):
+    return [[token if token in train_vocab else '<unk>' for token in tokens] for tokens in tokenized_reviews]
+
+
+# Tokenize validation and test sets
+val_tokenized = tokenize_reviews_for_eval(val_df, 1)
+val_tokenized_bigram = tokenize_reviews_for_eval(val_df, 2)
+test_tokenized = tokenize_reviews_for_eval(test_df, 1)
+test_tokenized_bigram = tokenize_reviews_for_eval(test_df, 2)
+
+# # Diagnostic: count OOV tokens before <unk> replacement
+# def count_oov(tokenized_reviews, train_vocab):
+#     return sum(1 for tokens in tokenized_reviews for token in tokens if token not in train_vocab)
+
+# val_oov_count = count_oov(val_tokenized, train_vocab)
+# test_oov_count = count_oov(test_tokenized, train_vocab)
+# print(f"OOV tokens in validation set before <unk> replacement: {val_oov_count}")
+# print(f"OOV tokens in test set before <unk> replacement: {test_oov_count}")
+
+
+# # Replace OOV tokens with <unk> in val/test sets
+# val_tokenized = replace_oov_with_unk(val_tokenized, train_vocab)
+# test_tokenized = replace_oov_with_unk(test_tokenized, train_vocab)
+
+# # Diagnostic: count <unk> tokens after replacement
+# def count_unk(tokenized_reviews):
+#     return sum(1 for tokens in tokenized_reviews for token in tokens if token == '<unk>')
+
+# val_unk_count = count_unk(val_tokenized)
+# test_unk_count = count_unk(test_tokenized)
+# print(f"<unk> tokens in validation set after replacement: {val_unk_count}")
+# print(f"<unk> tokens in test set after replacement: {test_unk_count}")
+
+
+# --- Perplexity calculations ---
+# --- Perplexity calculations ---
+print("\n--- Perplexity Results ---")
+
+# Kneser-Ney and Stupid Backoff bigram probability functions
+kn_bigram_prob = build_kneser_ney_bigram_probs(bigram_counts, unigram_counts)
+sb_bigram_prob = build_stupid_backoff_bigram_probs(bigram_counts, unigram_counts)
+
+# No smoothing
+unigram_probs_nosmooth = build_ngram_probabilities(unigram_counts)
+bigram_probs_nosmooth = build_ngram_probabilities(bigram_counts, unigram_counts)
+val_perp_uni_nosmooth = calculate_perplexity(val_tokenized, unigram_probs_nosmooth, 1)
+val_perp_bi_nosmooth = calculate_perplexity(val_tokenized_bigram, bigram_probs_nosmooth, 2)
+print(f"Validation Unigram Perplexity (no smoothing): {val_perp_uni_nosmooth:.2f}")
+print(f"Validation Bigram Perplexity (no smoothing): {val_perp_bi_nosmooth:.2f}")
+
+# Laplace smoothing
 unigram_probs_laplace = build_ngram_laplace_smoothing(unigram_counts, vocabulary_size)
-unigram_probs_k = build_k_smoothing(unigram_counts, 0.5, vocabulary_size)
-bigram_probs_no_smooth = build_ngram_probabilities(bigram_counts, unigram_counts)
 bigram_probs_laplace = build_ngram_laplace_smoothing(bigram_counts, vocabulary_size, unigram_counts)
+val_perp_uni_laplace = calculate_perplexity(val_tokenized, unigram_probs_laplace, 1)
+val_perp_bi_laplace = calculate_perplexity(val_tokenized_bigram, bigram_probs_laplace, 2)
+print(f"Validation Unigram Perplexity (Laplace): {val_perp_uni_laplace:.2f}")
+print(f"Validation Bigram Perplexity (Laplace): {val_perp_bi_laplace:.2f}")
+
+# K-smoothing (k=0.5)
+unigram_probs_k = build_k_smoothing(unigram_counts, 0.5, vocabulary_size)
 bigram_probs_k = build_k_smoothing(bigram_counts, 0.5, vocabulary_size, unigram_counts)
+val_perp_uni_k = calculate_perplexity(val_tokenized, unigram_probs_k, 1)
+val_perp_bi_k = calculate_perplexity(val_tokenized_bigram, bigram_probs_k, 2)
+print(f"Validation Unigram Perplexity (k=0.5): {val_perp_uni_k:.2f}")
+print(f"Validation Bigram Perplexity (k=0.5): {val_perp_bi_k:.2f}")
+
+# Kneser-Ney and Stupid Backoff Perplexity (Validation)
+val_perp_bi_kn = calculate_perplexity(val_tokenized_bigram, kn_bigram_prob, 2)
+val_perp_bi_sb = calculate_perplexity(val_tokenized_bigram, sb_bigram_prob, 2)
+print(f"Validation Bigram Perplexity (Kneser-Ney): {val_perp_bi_kn:.2f}")
+print(f"Validation Bigram Perplexity (Stupid Backoff): {val_perp_bi_sb:.2f}")
+
+print("\n--- Test Set Perplexity Results ---")
+
+# Test set perplexity (optional, can comment out if not needed)
+test_perp_uni_nosmooth = calculate_perplexity(test_tokenized, unigram_probs_nosmooth, 1)
+test_perp_bi_nosmooth = calculate_perplexity(test_tokenized_bigram, bigram_probs_nosmooth, 2)
+test_perp_uni_laplace = calculate_perplexity(test_tokenized, unigram_probs_laplace, 1)
+test_perp_bi_laplace = calculate_perplexity(test_tokenized_bigram, bigram_probs_laplace, 2)
+test_perp_uni_k = calculate_perplexity(test_tokenized, unigram_probs_k, 1)
+test_perp_bi_k = calculate_perplexity(test_tokenized_bigram, bigram_probs_k, 2)
+print(f"Test Unigram Perplexity (no smoothing): {test_perp_uni_nosmooth:.2f}")
+print(f"Test Bigram Perplexity (no smoothing): {test_perp_bi_nosmooth:.2f}")
+print(f"Test Unigram Perplexity (Laplace): {test_perp_uni_laplace:.2f}")
+print(f"Test Bigram Perplexity (Laplace): {test_perp_bi_laplace:.2f}")
+print(f"Test Unigram Perplexity (k=0.5): {test_perp_uni_k:.2f}")
+print(f"Test Bigram Perplexity (k=0.5): {test_perp_bi_k:.2f}")
+
+# Kneser-Ney and Stupid Backoff Perplexity (Test)
+test_perp_bi_kn = calculate_perplexity(test_tokenized_bigram, kn_bigram_prob, 2)
+test_perp_bi_sb = calculate_perplexity(test_tokenized_bigram, sb_bigram_prob, 2)
+print(f"Test Bigram Perplexity (Kneser-Ney): {test_perp_bi_kn:.2f}")
+print(f"Test Bigram Perplexity (Stupid Backoff): {test_perp_bi_sb:.2f}")
 
 
-# print (",..................................\n\n")
-unigram_keys_not_in_train = compare_dicts(unigram_counts,test_unigram_counts)
-print (len(unigram_keys_not_in_train))
 
-# Calculate and print perplexities for val, train, and test sets
 
-# Unigram perplexities
-val_unigram_perplexity = calculate_perplexity(
-    val_unigram_counts, unigram_probs_no_smooth, training_counts=unigram_counts,
-    context_counts=None, vocab_size=vocabulary_size, smoothing_type="none"
-)
-train_unigram_perplexity = calculate_perplexity(
-    unigram_counts, unigram_probs_no_smooth, training_counts=unigram_counts,
-    context_counts=None, vocab_size=vocabulary_size, smoothing_type="none"
-)
-test_unigram_perplexity = calculate_perplexity(
-    test_unigram_counts, unigram_probs_no_smooth, training_counts=unigram_counts,
-    context_counts=None, vocab_size=vocabulary_size, smoothing_type="none"
-)
-
-print()
-print("Unigram NO SMOOTH")
-print(f"Unigram Perplexity (val) no smooth: {val_unigram_perplexity}")
-print(f"Unigram Perplexity (train) no smooth: {train_unigram_perplexity}")
-print(f"Unigram Perplexity (test) no smooth: {test_unigram_perplexity}")
-
-# Bigram perplexities
-val_bigram_perplexity = calculate_perplexity(
-    val_bigram_counts, bigram_probs_no_smooth, training_counts=bigram_counts,
-    context_counts=unigram_counts, vocab_size=vocabulary_size, smoothing_type="none"
-)
-train_bigram_perplexity = calculate_perplexity(
-    bigram_counts, bigram_probs_no_smooth, training_counts=bigram_counts,
-    context_counts=unigram_counts, vocab_size=vocabulary_size, smoothing_type="none"
-)
-test_bigram_perplexity = calculate_perplexity(
-    test_bigram_counts, bigram_probs_no_smooth, training_counts=bigram_counts,
-    context_counts=unigram_counts, vocab_size=vocabulary_size, smoothing_type="none"
-)
-
-print()
-print("Bigram NO SMOOTH")
-print(f"Bigram Perplexity (val) no smooth: {val_bigram_perplexity}")
-print(f"Bigram Perplexity (train) no smooth: {train_bigram_perplexity}")
-print(f"Bigram Perplexity (test) no smooth: {test_bigram_perplexity}")
-
-# Unigram perplexities with Laplace smoothing
-val_unigram_perplexity_laplace = calculate_perplexity(
-    val_unigram_counts, unigram_probs_laplace, training_counts=unigram_counts,
-    context_counts=None, vocab_size=vocabulary_size, smoothing_type="laplace"
-)
-train_unigram_perplexity_laplace = calculate_perplexity(
-    unigram_counts, unigram_probs_laplace, training_counts=unigram_counts,
-    context_counts=None, vocab_size=vocabulary_size, smoothing_type="laplace"
-)
-test_unigram_perplexity_laplace = calculate_perplexity(
-    test_unigram_counts, unigram_probs_laplace, training_counts=unigram_counts,
-    context_counts=None, vocab_size=vocabulary_size, smoothing_type="laplace"
-)
-
-print()
-print("Unigram LAPLACE")
-print(f"Unigram Perplexity (val) Laplace: {val_unigram_perplexity_laplace}")
-print(f"Unigram Perplexity (train) Laplace: {train_unigram_perplexity_laplace}")
-print(f"Unigram Perplexity (test) Laplace: {test_unigram_perplexity_laplace}")
-# Unigram perplexities with k-smoothing
-val_unigram_perplexity_k = calculate_perplexity(
-    val_unigram_counts, unigram_probs_k, training_counts=unigram_counts,
-    context_counts=None, vocab_size=vocabulary_size, smoothing_type="k_smoothing", k=0.5
-)
-train_unigram_perplexity_k = calculate_perplexity(
-    unigram_counts, unigram_probs_k, training_counts=unigram_counts,
-    context_counts=None, vocab_size=vocabulary_size, smoothing_type="k_smoothing", k=0.5
-)
-test_unigram_perplexity_k = calculate_perplexity(
-    test_unigram_counts, unigram_probs_k, training_counts=unigram_counts,
-    context_counts=None, vocab_size=vocabulary_size, smoothing_type="k_smoothing", k=0.5
-)
-
-print()
-print("Unigram K-SMOOTHING")
-print(f"Unigram Perplexity (val) k-smoothing: {val_unigram_perplexity_k}")
-print(f"Unigram Perplexity (train) k-smoothing: {train_unigram_perplexity_k}")
-print(f"Unigram Perplexity (test) k-smoothing: {test_unigram_perplexity_k}")
-# Bigram perplexities with Laplace smoothing
-val_bigram_perplexity_laplace = calculate_perplexity(
-    val_bigram_counts, bigram_probs_laplace, training_counts=bigram_counts,
-    context_counts=unigram_counts, vocab_size=vocabulary_size, smoothing_type="laplace"
-)
-train_bigram_perplexity_laplace = calculate_perplexity(
-    bigram_counts, bigram_probs_laplace, training_counts=bigram_counts,
-    context_counts=unigram_counts, vocab_size=vocabulary_size, smoothing_type="laplace"
-)
-test_bigram_perplexity_laplace = calculate_perplexity(
-    test_bigram_counts, bigram_probs_laplace, training_counts=bigram_counts,
-    context_counts=unigram_counts, vocab_size=vocabulary_size, smoothing_type="laplace"
-)
-
-print()
-print("Bigram LAPLACE")
-print(f"Bigram Perplexity (val) Laplace: {val_bigram_perplexity_laplace}")
-print(f"Bigram Perplexity (train) Laplace: {train_bigram_perplexity_laplace}")
-print(f"Bigram Perplexity (test) Laplace: {test_bigram_perplexity_laplace}")
-
-# Bigram perplexities with k-smoothing
-val_bigram_perplexity_k = calculate_perplexity(
-    val_bigram_counts, bigram_probs_k, training_counts=bigram_counts,
-    context_counts=unigram_counts, vocab_size=vocabulary_size, smoothing_type="k_smoothing", k=0.5
-)
-train_bigram_perplexity_k = calculate_perplexity(
-    bigram_counts, bigram_probs_k, training_counts=bigram_counts,
-    context_counts=unigram_counts, vocab_size=vocabulary_size, smoothing_type="k_smoothing", k=0.5
-)
-test_bigram_perplexity_k = calculate_perplexity(
-    test_bigram_counts, bigram_probs_k, training_counts=bigram_counts,
-    context_counts=unigram_counts, vocab_size=vocabulary_size, smoothing_type="k_smoothing", k=0.5
-)
-
-print()
-print("Bigram K-SMOOTHING")
-print(f"Bigram Perplexity (val) k-smoothing: {val_bigram_perplexity_k}")
-print(f"Bigram Perplexity (train) k-smoothing: {train_bigram_perplexity_k}")
-print(f"Bigram Perplexity (test) k-smoothing: {test_bigram_perplexity_k}")
-
-# sys.exit(0)
