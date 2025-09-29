@@ -1,49 +1,3 @@
-# --- Kneser-Ney and Stupid Backoff Smoothing for Bigrams ---
-def build_kneser_ney_bigram_probs(bigram_counts, unigram_counts, discount=0.75):
-    # Collect continuation counts
-    continuation_counts = Counter()
-    for (w1, w2) in bigram_counts:
-        continuation_counts[w2] += 1
-    total_bigrams = sum(bigram_counts.values())
-    total_unigrams = sum(unigram_counts.values())
-    unique_bigrams = len(bigram_counts)
-    unique_continuations = len(continuation_counts)
-
-    # Precompute lambdas for each context
-    lambdas = {}
-    for (w1,) in unigram_counts:
-        n_continuations = len([w2 for (ww1, w2) in bigram_counts if ww1 == w1])
-        lambdas[w1] = (discount * n_continuations) / unigram_counts[(w1,)] if unigram_counts[(w1,)] > 0 else 0.0
-
-    # Precompute continuation probabilities
-    p_continuation = {w2: continuation_counts[w2] / unique_bigrams for w2 in continuation_counts}
-
-    def kn_prob(w1, w2):
-        bigram = (w1, w2)
-        c_bigram = bigram_counts.get(bigram, 0)
-        c_w1 = unigram_counts.get((w1,), 0)
-        lambda_w1 = lambdas.get(w1, 0.0)
-        p_cont = p_continuation.get(w2, 1e-8)
-        if c_w1 > 0:
-            return max(c_bigram - discount, 0) / c_w1 + lambda_w1 * p_cont
-        else:
-            return p_cont
-    return kn_prob
-
-def build_stupid_backoff_bigram_probs(bigram_counts, unigram_counts, alpha=0.4):
-    total_unigrams = sum(unigram_counts.values())
-    def sb_prob(w1, w2):
-        bigram = (w1, w2)
-        c_bigram = bigram_counts.get(bigram, 0)
-        c_w1 = unigram_counts.get((w1,), 0)
-        if c_bigram > 0 and c_w1 > 0:
-            return c_bigram / c_w1
-        else:
-            # Backoff to unigram
-            c_w2 = unigram_counts.get((w2,), 0)
-            return alpha * (c_w2 / total_unigrams if total_unigrams > 0 else 1e-8)
-    return sb_prob
-
 import pandas as pd
 from collections import defaultdict,Counter
 import nltk
@@ -186,6 +140,52 @@ def build_stupid_backoff(ngram_counts, ngram_context_counts, alpha=0.4):
             else:
                 # recursively backoff
                 return alpha * sb_prob(ngram[1:])
+            
+# --- Kneser-Ney and Stupid Backoff Smoothing for Bigrams ---
+def build_kneser_ney_bigram_probs(bigram_counts, unigram_counts, discount=0.75):
+    # Collect continuation counts
+    continuation_counts = Counter()
+    for (w1, w2) in bigram_counts:
+        continuation_counts[w2] += 1
+    total_bigrams = sum(bigram_counts.values())
+    total_unigrams = sum(unigram_counts.values())
+    unique_bigrams = len(bigram_counts)
+    unique_continuations = len(continuation_counts)
+
+    # Precompute lambdas for each context
+    lambdas = {}
+    for (w1,) in unigram_counts:
+        n_continuations = len([w2 for (ww1, w2) in bigram_counts if ww1 == w1])
+        lambdas[w1] = (discount * n_continuations) / unigram_counts[(w1,)] if unigram_counts[(w1,)] > 0 else 0.0
+
+    # Precompute continuation probabilities
+    p_continuation = {w2: continuation_counts[w2] / unique_bigrams for w2 in continuation_counts}
+
+    def kn_prob(w1, w2):
+        bigram = (w1, w2)
+        c_bigram = bigram_counts.get(bigram, 0)
+        c_w1 = unigram_counts.get((w1,), 0)
+        lambda_w1 = lambdas.get(w1, 0.0)
+        p_cont = p_continuation.get(w2, 1e-8)
+        if c_w1 > 0:
+            return max(c_bigram - discount, 0) / c_w1 + lambda_w1 * p_cont
+        else:
+            return p_cont
+    return kn_prob
+
+def build_stupid_backoff_bigram_probs(bigram_counts, unigram_counts, alpha=0.4):
+    total_unigrams = sum(unigram_counts.values())
+    def sb_prob(w1, w2):
+        bigram = (w1, w2)
+        c_bigram = bigram_counts.get(bigram, 0)
+        c_w1 = unigram_counts.get((w1,), 0)
+        if c_bigram > 0 and c_w1 > 0:
+            return c_bigram / c_w1
+        else:
+            # Backoff to unigram
+            c_w2 = unigram_counts.get((w2,), 0)
+            return alpha * (c_w2 / total_unigrams if total_unigrams > 0 else 1e-8)
+    return sb_prob
 
 def compare_dicts(train_dict,val_dict):
     keys_not_in_train = set(val_dict.keys()) - set(train_dict.keys())
