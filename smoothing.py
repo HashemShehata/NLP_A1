@@ -1,27 +1,32 @@
 import sys
 
-def build_ngram_laplace_smoothing(ngram_counts,vocab_size,ngram_context_counts=None):
+def get_k_smoothing(val_ngram_counts,k,vocab_size,train_ngram_counts,train_ngram_context_counts=None,train_prob_vocab=None):
     ngram_probs = dict()
-
-    for ngram, count in ngram_counts.items():
+    for ngram, _ in val_ngram_counts.items():
+        prob_ngram = train_prob_vocab.get(ngram,0)
+        if prob_ngram!=0:
+            ngram_probs[ngram]=prob_ngram
+            continue
+        
         context = ngram[:-1]
-        if ngram_context_counts is not None: 
-            context_count = ngram_context_counts.get(context, 0)
+        if train_ngram_context_counts is not None: 
+            context_count = train_ngram_context_counts.get(context, 0)
         else:
             # For unigrams, use total corpus size as context
-            total_ngrams = sum(ngram_counts.values())
+            total_ngrams = sum(train_ngram_counts.values())
             context_count = total_ngrams
         try:
-            ngram_probs[ngram] = (count+1) / (context_count+vocab_size)
+            count=0
+            ngram_probs[ngram] = (count+k) / (context_count+k*vocab_size)
         except Exception as e:
             print (e)
             print (f"Context words are {context}")
             sys.exit(0)
-    return ngram_probs 
+    return ngram_probs
+
 
 def build_k_smoothing(ngram_counts,k,vocab_size,ngram_context_counts=None):
     ngram_probs = dict()
-
     for ngram, count in ngram_counts.items():
         context = ngram[:-1]
         if ngram_context_counts is not None: 

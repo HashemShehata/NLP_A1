@@ -27,6 +27,14 @@ def tokenize(text,n):
 
     return tokenized_sentences
 
+def tokenize_switch(text, n):
+    if TOKENIZATION_MODE == 'word':
+        return tokenize(text, n)
+    elif TOKENIZATION_MODE == 'byte':
+        return byte_tokenize(text, n)
+    else:
+        raise ValueError('Unknown tokenization mode')
+
 def compare_dicts(train_dict,val_dict):
     keys_not_in_train = set(val_dict.keys()) - set(train_dict.keys())
     return keys_not_in_train
@@ -42,4 +50,4 @@ def write_to_file(data,filename,sort=True):
                 f.write(f"{item[0]}: {item[1]}\n")
         else:
             for d in data:
-                f.write(d + "\n")
+                f.write(f"{d}\n")

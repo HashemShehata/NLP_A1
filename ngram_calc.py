@@ -13,9 +13,14 @@ def build_ngram(df, n):
 
 
 
-def build_ngram_probabilities(ngram_counts,ngram_context_counts=None):
+def build_ngram_probabilities(ngram_counts,ngram_context_counts=None, prob_vocab=None):
     ngram_probs = dict()
-
+    ### for testing or validation get probs directly
+    if prob_vocab is not None:
+        for ngram,_ in ngram_counts.items():
+            ngram_probs[ngram] = prob_vocab.get(ngram,0)
+        return ngram_probs
+    ### for calculating training probs
     if ngram_context_counts is None:
         total_ngrams = sum(ngram_counts.values())
         context_count = total_ngrams
