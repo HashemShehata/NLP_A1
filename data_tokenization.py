@@ -2,6 +2,9 @@ import nltk
 nltk.download('punkt_tab')
 from collections import Counter
 
+# --- Tokenization mode switch ---
+TOKENIZATION_MODE = 'byte'  # 'word' or 'byte'
+
 def read_file(filename):
     try:
         with open(filename, 'r', encoding='utf-8') as f:
@@ -10,6 +13,13 @@ def read_file(filename):
     except Exception as e:
         print (f"Unable to read the file {filename}: {e}")
         return 
+    
+
+def byte_tokenize(text, n):
+    # Tokenize text into bytes, return list of byte strings
+    text_bytes = text.encode('utf-8')
+    # For n-gram, treat each byte as a token (as int or as byte string)
+    return [str(b) for b in text_bytes]
     
 
 def tokenize(text,n):
