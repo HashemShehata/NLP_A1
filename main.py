@@ -147,6 +147,10 @@ train_tokenized_unk = replace_rare_with_unk_tokenized(train_df, rare_tokens, 1)
 train_unigram_counts_unk = build_ngram_from_tokenized(train_tokenized_unk, 1)
 train_bigram_counts_unk = build_ngram_from_tokenized(train_tokenized_unk, 2)
 
+# 2.5 Probabilities for <unk> aware training counts
+train_unigram_probs_unk = build_ngram_probabilities(train_unigram_counts_unk)
+train_bigram_probs_unk = build_ngram_probabilities(train_bigram_counts_unk, train_unigram_counts_unk)
+
 # 3. Final training vocab (after UNK replacement)
 train_vocab = set(token for (token,) in train_unigram_counts_unk.keys())
 
@@ -181,11 +185,11 @@ print("train results:")
 print_no_smoothing_results(train_unigram_counts_unk)
 print_no_smoothing_results(train_bigram_counts_unk, train_unigram_counts_unk, None)
 print("validation results:")
-print_no_smoothing_results(val_unigram_counts_unk, None, train_unigram_counts_unk)
-print_no_smoothing_results(val_bigram_counts_unk, None, train_bigram_counts_unk)
+print_no_smoothing_results(val_unigram_counts_unk, None, train_unigram_probs_unk)
+print_no_smoothing_results(val_bigram_counts_unk, None, train_bigram_probs_unk)
 print("test results:")
-print_no_smoothing_results(test_unigram_counts_unk, None, train_unigram_counts_unk)
-print_no_smoothing_results(test_bigram_counts_unk, None, train_bigram_counts_unk)
+print_no_smoothing_results(test_unigram_counts_unk, None, train_unigram_probs_unk)
+print_no_smoothing_results(test_bigram_counts_unk, None, train_bigram_probs_unk)
 print()
 
 print("STUPID BACKOFF RESULTS AFTER UNK HANDLING")
