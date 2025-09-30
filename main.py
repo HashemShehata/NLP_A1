@@ -5,7 +5,7 @@ random.seed(42)
 from ngram_calc import build_ngram, build_ngram_probabilities
 from data_tokenization import read_file,write_to_file, compare_dicts
 from perplexity import perplexity
-from unk_handling import replace_rare_with_unk_tokenized, replace_oov_with_unk
+from unk_handling import replace_rare_with_unk_tokenized, replace_oov_with_unk, rare_tokens
 from smoothing import build_kneser_ney_bigram_probs, build_stupid_backoff_bigram_probs, get_k_smoothing, build_k_smoothing
 base_directory = "A1_DATASET/"
 
@@ -45,6 +45,17 @@ val_unigram_counts = build_ngram(val_df, 1)
 val_bigram_counts = build_ngram(val_df, 2) 
 test_unigram_counts = build_ngram(test_df, 1) 
 test_bigram_counts = build_ngram(test_df, 2) 
+
+
+# Replace rare tokens in train_df for unigrams (tokenized)
+train_tokenized_unk = replace_rare_with_unk_tokenized(train_df, rare_tokens, 1)
+
+# Build set of known tokens (training vocab, after <unk> replacement)
+train_vocab = set(token for (token,), count in unigram_counts.items())
+
+# # Replace OOV tokens with <unk> in val/test sets
+# val_tokenized = replace_oov_with_unk(val_tokenized, train_vocab)
+# test_tokenized = replace_oov_with_unk(test_tokenized, train_vocab)
 
 
 ### Unsmoothed version 
@@ -129,9 +140,6 @@ for k in [0.001,0.01,0.02,0.04,0.08,0.1,0.2,0.4,0.8,1]:
     print (f"Perpelexity of test set on unigrams is ",perplexity(test_unigram_probs,test_unigram_counts))
     print (f"Perpelexity of test set on bigrams is ",perplexity(test_bigram_probs,test_bigram_counts))
 
-
-    print (f"Perpelexity of test set on unigrams is ",perplexity(test_unigram_probs,test_unigram_counts))
-    print (f"Perpelexity of test set on bigrams is ",perplexity(test_bigram_probs,test_bigram_counts))
 
 ### Kneser-Ney Smoothing
 print("\n" + "="*50)

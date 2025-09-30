@@ -13,6 +13,8 @@ def replace_rare_with_unk_tokenized(sentences, rare_tokens, n):
         tokenized_reviews.append(new_tokens)
     return tokenized_reviews
 
+
+# not needed only used for testing
 # Function to replace OOV tokens with <unk> in tokenized data
 def replace_oov_with_unk(tokenized_reviews, train_vocab):
     return [[token if token in train_vocab else '<unk>' for token in tokens] for tokens in tokenized_reviews]
