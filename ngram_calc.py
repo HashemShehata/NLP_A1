@@ -1,6 +1,9 @@
 from collections import Counter
 from data_tokenization import tokenize
 import sys
+from unk_handling import train_tokenized_unk
+
+
 
 def build_ngram(df, n):
     ngram_counts = Counter()
@@ -36,3 +39,13 @@ def build_ngram_probabilities(ngram_counts,ngram_context_counts=None, prob_vocab
             print (f"Context words are {context}")
             sys.exit(0)
     return ngram_probs   
+
+
+# Rebuild ngram counts with <unk> using tokenized lists
+def build_ngram_from_tokenized(tokenized_reviews, n):
+    ngram_counts = Counter()
+    for tokens in tokenized_reviews:
+        ngram_counts.update(tuple(tokens[i:i+n]) for i in range(len(tokens) - n + 1))
+    return ngram_counts
+
+

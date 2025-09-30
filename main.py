@@ -2,10 +2,10 @@ import os
 import random
 random.seed(42)
 
-from ngram_calc import build_ngram, build_ngram_probabilities
+from ngram_calc import build_ngram, build_ngram_from_tokenized, build_ngram_probabilities
 from data_tokenization import read_file,write_to_file, compare_dicts, tokenize_switch
 from perplexity import perplexity
-from unk_handling import replace_rare_with_unk_tokenized, replace_oov_with_unk, rare_tokens
+from unk_handling import replace_rare_with_unk_tokenized, rare_tokens
 from smoothing import build_kneser_ney_bigram_probs, build_stupid_backoff_bigram_probs, get_k_smoothing, build_k_smoothing
 base_directory = "A1_DATASET/"
 
@@ -23,11 +23,12 @@ if not os.path.exists(f"{base_directory}dev_split_20.txt"):
     write_to_file(train_df,f"{base_directory}train_split_80.txt")
     write_to_file(val_df,f"{base_directory}dev_split_20.txt")
 
+
 else:
     print ("Reading directly")
     train_df = read_file(f"{base_directory}train_split_80.txt")
     val_df = read_file(f"{base_directory}dev_split_20.txt")
-    
+  
 test_df = read_file(f"{base_directory}val.txt")
 
 # Build ngram counts
@@ -202,8 +203,7 @@ for alpha in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]:
     print(f"    Test Perplexity: {perplexity(test_bigram_probs_sb, test_bigram_counts)}")
 
 
-# First pass: get unigram counts
-raw_unigram_counts = build_ngram(train_df, 1)
+
 #Handling <unk>
 # Replace rare tokens in train_df for unigrams (tokenized)
 train_tokenized_unk = replace_rare_with_unk_tokenized(train_df, rare_tokens, 1)
@@ -224,3 +224,19 @@ val_tokenized = tokenize_reviews_for_eval(val_df, 1)
 val_tokenized_bigram = tokenize_reviews_for_eval(val_df, 2)
 test_tokenized = tokenize_reviews_for_eval(test_df, 1)
 test_tokenized_bigram = tokenize_reviews_for_eval(test_df, 2)
+
+
+unigram_counts = build_ngram_from_tokenized(train_tokenized_unk, 1)
+bigram_counts = build_ngram_from_tokenized(train_tokenized_unk, 2)
+
+# Output unigram counts
+sorted_unigram_counter = sorted(unigram_counts.items(), key=lambda x: x[1], reverse=True)
+with open("output_unigram_counts_with_unk.txt", "w") as f:
+    for item in sorted_unigram_counter:
+        f.write(f"{item[0]}: {item[1]}\n")
+
+# Output bigram counts
+sorted_bigram_counter = sorted(bigram_counts.items(), key=lambda x: x[1], reverse=True)
+with open("output_bigram_counts_with_unk.txt", "w") as f:
+    for item in sorted_bigram_counter:
+        f.write(f"{item[0]}: {item[1]}\n")

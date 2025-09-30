@@ -61,3 +61,5 @@ def write_to_file(data,filename,sort=True):
         else:
             for d in data:
                 f.write(f"{d}\n")
+
+
