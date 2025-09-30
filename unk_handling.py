@@ -1,15 +1,15 @@
 from data_tokenization import tokenize_switch
 from ngram_calc import build_ngram
-from main import train_df
-
-
-
 
 # First pass: get unigram counts
-raw_unigram_counts = build_ngram(train_df, 1)
+def get_raw_counts(df):
+    ngram = 1
+    return build_ngram(df, ngram)
+
 
 # Find tokens with freq=1
-rare_tokens = set([token for token, count in raw_unigram_counts.items() if count == 2])
+def set_threshold(raw_unigram_counts, threshold=2):
+    return set([token for token, count in raw_unigram_counts.items() if count <= threshold])
 
 def replace_rare_with_unk_tokenized(sentences, rare_tokens, n):
     tokenized_reviews = []
@@ -19,10 +19,14 @@ def replace_rare_with_unk_tokenized(sentences, rare_tokens, n):
         tokenized_reviews.append(new_tokens)
     return tokenized_reviews
 
-# Replace rare tokens in train_df for unigrams (tokenized)
-train_tokenized_unk = replace_rare_with_unk_tokenized(train_df, rare_tokens, 1)
+def replace_oov_with_unk(tokenized_reviews, train_vocab):
+    """Map tokens not in training vocabulary to <unk>.
 
-# # not needed only used for testing
-# # Function to replace OOV tokens with <unk> in tokenized data
-# def replace_oov_with_unk(tokenized_reviews, train_vocab):
-#     return [[token if token in train_vocab else '<unk>' for token in tokens] for tokens in tokenized_reviews]
+    Args:
+        tokenized_reviews: List[List[str]] token lists.
+        train_vocab: Set[str] of tokens retained after UNK replacement in training.
+    Returns:
+        New tokenized list with OOV tokens replaced by <unk>.
+    """
+    return [[tok if (tok in train_vocab or tok == '<unk>') else '<unk>' for tok in tokens]
+            for tokens in tokenized_reviews]

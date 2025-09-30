@@ -3,7 +3,7 @@ nltk.download('punkt_tab')
 from collections import Counter
 
 # --- Tokenization mode switch ---
-TOKENIZATION_MODE = 'byte'  # 'word' or 'byte'
+TOKENIZATION_MODE = 'word'  # 'word' or 'byte'
 
 def read_file(filename):
     try:
