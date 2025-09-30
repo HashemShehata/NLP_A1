@@ -3,7 +3,7 @@ import random
 random.seed(42)
 
 from ngram_calc import build_ngram, build_ngram_probabilities
-from data_tokenization import read_file,write_to_file, compare_dicts
+from data_tokenization import read_file,write_to_file, compare_dicts, tokenize_switch
 from perplexity import perplexity
 from unk_handling import replace_rare_with_unk_tokenized, replace_oov_with_unk, rare_tokens
 from smoothing import build_kneser_ney_bigram_probs, build_stupid_backoff_bigram_probs, get_k_smoothing, build_k_smoothing
@@ -45,17 +45,6 @@ val_unigram_counts = build_ngram(val_df, 1)
 val_bigram_counts = build_ngram(val_df, 2) 
 test_unigram_counts = build_ngram(test_df, 1) 
 test_bigram_counts = build_ngram(test_df, 2) 
-
-
-# Replace rare tokens in train_df for unigrams (tokenized)
-train_tokenized_unk = replace_rare_with_unk_tokenized(train_df, rare_tokens, 1)
-
-# Build set of known tokens (training vocab, after <unk> replacement)
-train_vocab = set(token for (token,), count in unigram_counts.items())
-
-# # Replace OOV tokens with <unk> in val/test sets
-# val_tokenized = replace_oov_with_unk(val_tokenized, train_vocab)
-# test_tokenized = replace_oov_with_unk(test_tokenized, train_vocab)
 
 
 ### Unsmoothed version 
@@ -211,3 +200,27 @@ for alpha in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]:
     
     print(f"    Val Perplexity: {perplexity(val_bigram_probs_sb, val_bigram_counts)}")
     print(f"    Test Perplexity: {perplexity(test_bigram_probs_sb, test_bigram_counts)}")
+
+
+# First pass: get unigram counts
+raw_unigram_counts = build_ngram(train_df, 1)
+#Handling <unk>
+# Replace rare tokens in train_df for unigrams (tokenized)
+train_tokenized_unk = replace_rare_with_unk_tokenized(train_df, rare_tokens, 1)
+
+# Build set of known tokens (training vocab, after <unk> replacement)
+train_vocab = set(token for (token,), count in unigram_counts.items())
+
+# # Replace OOV tokens with <unk> in val/test sets
+# val_tokenized = replace_oov_with_unk(val_tokenized, train_vocab)
+# test_tokenized = replace_oov_with_unk(test_tokenized, train_vocab)
+
+# Function to tokenize reviews for evaluation
+def tokenize_reviews_for_eval(reviews, n):
+    return [tokenize_switch(review, n) for review in reviews]
+
+# Tokenize validation and test sets
+val_tokenized = tokenize_reviews_for_eval(val_df, 1)
+val_tokenized_bigram = tokenize_reviews_for_eval(val_df, 2)
+test_tokenized = tokenize_reviews_for_eval(test_df, 1)
+test_tokenized_bigram = tokenize_reviews_for_eval(test_df, 2)
