@@ -63,15 +63,17 @@ print (f"Test tokens not found in train")
 print (len(compare_dicts(train_unigram_counts,test_unigram_counts)))
 print (len(compare_dicts(train_bigram_counts,test_bigram_counts)))
 
-
 # No smoothing perplexity results NO UNK
 print("NO SMOOTHING RESULTS NO UNK")
+print("train results:")
 print_no_smoothing_results(train_unigram_counts)
-print_no_smoothing_results(train_bigram_counts)
-print_no_smoothing_results(val_unigram_counts)
-print_no_smoothing_results(val_bigram_counts)
-print_no_smoothing_results(test_unigram_counts)
-print_no_smoothing_results(test_bigram_counts)
+print_no_smoothing_results(train_bigram_counts, train_unigram_counts, None)
+print("validation results:")
+print_no_smoothing_results(val_unigram_counts, None, train_unigram_probs)
+print_no_smoothing_results(val_bigram_counts, None, train_unigram_probs)
+print("test results:")
+print_no_smoothing_results(test_unigram_counts, None, train_unigram_probs)
+print_no_smoothing_results(test_bigram_counts, None, train_unigram_probs)
 print()
 
 ### Laplace Smoothing NO UNK version 
@@ -82,11 +84,9 @@ train_bigram_probs_k_smoothing = build_k_smoothing(train_bigram_counts, k, vocab
 
 # print_laplace_smoothing_results(train_unigram_counts, vocabulary_size)
 
-
 print (f"Validation tokens not found in train")
 write_to_file(list(compare_dicts(train_unigram_counts,val_unigram_counts)),'not_found_unigrams.txt')
 write_to_file(list(compare_dicts(train_bigram_counts,val_bigram_counts)),'not_found_bigrams.txt')
-
 
 val_unigram_probs = get_k_smoothing(val_unigram_counts,k,vocabulary_size,train_unigram_counts,train_prob_vocab=train_unigram_probs_k_smoothing)
 val_bigram_probs = get_k_smoothing(val_bigram_counts,k,vocabulary_size,train_bigram_counts,train_unigram_counts,train_bigram_probs_k_smoothing)
@@ -95,12 +95,10 @@ print (f"Perpelexity of validation set on unigrams is ", perplexity(val_unigram_
 print (f"Perpelexity of validation set on bigrams is ", perplexity(val_bigram_probs, val_bigram_counts))
 
 test_unigram_probs = get_k_smoothing(test_unigram_counts,k,vocabulary_size,train_unigram_counts,train_prob_vocab= train_unigram_probs)
-
 test_bigram_probs = get_k_smoothing(test_bigram_counts,k,vocabulary_size,train_bigram_counts,train_unigram_counts,train_bigram_probs)
 
 print (f"Perpelexity of test set on unigrams is ",perplexity(test_unigram_probs, test_unigram_counts))
 print (f"Perpelexity of test set on bigrams is ",perplexity(test_bigram_probs, test_bigram_counts))
-
 
 ### K Smoothed version 
 print("K Smoothing no UNK version ")
@@ -113,14 +111,12 @@ for k in [0.001,0.01,0.02,0.04,0.08,0.1,0.2,0.4,0.8,1]:
     write_to_file(bigram_probs,"output_bigram_probs.txt",sort=True)
 
     val_unigram_probs = get_k_smoothing(val_unigram_counts,k,vocabulary_size,train_unigram_counts,train_prob_vocab=unigram_probs)
-
     val_bigram_probs = get_k_smoothing(val_bigram_counts,k,vocabulary_size,train_bigram_counts,train_unigram_counts,train_bigram_probs)
 
     print (f"Perpelexity of validation set on unigrams is ",perplexity(val_unigram_probs,val_unigram_counts))
     print (f"Perpelexity of validation set on bigrams is ",perplexity(val_bigram_probs,val_bigram_counts))
 
     test_unigram_probs = get_k_smoothing(test_unigram_counts,k,vocabulary_size,train_unigram_counts,train_prob_vocab=unigram_probs)
-
     test_bigram_probs = get_k_smoothing(test_bigram_counts,k,vocabulary_size,train_bigram_counts,train_unigram_counts,train_bigram_probs)
 
     print (f"Perpelexity of test set on unigrams is ",perplexity(test_unigram_probs,test_unigram_counts))
@@ -136,14 +132,15 @@ print_kn_results(train_bigram_counts, train_unigram_counts, val_bigram_counts, d
 print("test results:")
 print_kn_results(train_bigram_counts, train_unigram_counts, test_bigram_counts, discount=0.75)
 
-
+print("************************EVERYTHING BELOW IS WITH UNK HANDLING********************")
+print()
 ##############################################################################
 #                              UNK HANDLING                                  #
 ##############################################################################
 
 # 1. Determine rare tokens in training (threshold == 1 -> replace frequency <=1)
 train_raw_unigram_counts = build_ngram(train_df, 1)
-rare_tokens = set_threshold(train_raw_unigram_counts, threshold=1)
+rare_tokens = set_threshold(train_raw_unigram_counts, threshold=2)
 
 # 2. Replace rares with <unk> in training and rebuild counts
 train_tokenized_unk = replace_rare_with_unk_tokenized(train_df, rare_tokens, 1)
@@ -180,15 +177,25 @@ with open("output_bigram_counts_with_unk.txt", "w") as f:
         f.write(f"{item[0]}: {item[1]}\n")
 
 print("NO SMOOTHING RESULTS AFTER UNK HANDLING")
+print("train results:")
 print_no_smoothing_results(train_unigram_counts_unk)
-print_no_smoothing_results(train_bigram_counts_unk)
-print_no_smoothing_results(val_unigram_counts_unk)
-print_no_smoothing_results(val_bigram_counts_unk)
-print_no_smoothing_results(test_unigram_counts_unk)
-print_no_smoothing_results(test_bigram_counts_unk)
+print_no_smoothing_results(train_bigram_counts_unk, train_unigram_counts_unk, None)
+print("validation results:")
+print_no_smoothing_results(val_unigram_counts_unk, None, train_unigram_counts_unk)
+print_no_smoothing_results(val_bigram_counts_unk, None, train_bigram_counts_unk)
+print("test results:")
+print_no_smoothing_results(test_unigram_counts_unk, None, train_unigram_counts_unk)
+print_no_smoothing_results(test_bigram_counts_unk, None, train_bigram_counts_unk)
 print()
 
 print("STUPID BACKOFF RESULTS AFTER UNK HANDLING")
 print_stupid_backoff_results(train_bigram_counts_unk, train_unigram_counts_unk, val_bigram_counts_unk, alpha=0.4)
 print_stupid_backoff_results(train_bigram_counts_unk, train_unigram_counts_unk, test_bigram_counts_unk, alpha=0.4)
+print()
+
+print("Kneser-Ney Smoothing AFTER UNK HANDLING")
+print("validation results:")
+print_kn_results(train_bigram_counts_unk, train_unigram_counts_unk, val_bigram_counts_unk, discount=0.75)
+print("test results:")
+print_kn_results(train_bigram_counts_unk, train_unigram_counts_unk, test_bigram_counts_unk, discount=0.75)
 print()

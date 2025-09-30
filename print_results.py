@@ -4,10 +4,10 @@ from smoothing import build_kneser_ney_bigram_probs, get_k_smoothing, build_stup
 
 
 def print_perplexity_results(ngram_probs, ngram_counts):
-    print(f"Perplexity of validation set on bigrams (No Smoothing): {perplexity(ngram_probs, ngram_counts)}")
+    print(f"Perplexity score: {perplexity(ngram_probs, ngram_counts)}")
 
-def print_no_smoothing_results(ngram_counts):
-    ngram_probs = build_ngram_probabilities(ngram_counts)
+def print_no_smoothing_results(ngram_counts, ngram_context_counts=None, prob_vocab=None):
+    ngram_probs = build_ngram_probabilities(ngram_counts, ngram_context_counts, prob_vocab)
     print_perplexity_results(ngram_probs, ngram_counts)
 
 def print_k_smoothing_results(ngram_counts):
@@ -26,7 +26,6 @@ def print_laplace_smoothing_results(ngram_counts, vocab_size):
     bigram_probs_laplace = get_k_smoothing(ngram_counts, k, vocab_size)
     print_perplexity_results(ngram_counts, bigram_probs_laplace)
 
-
 def print_kn_results(train_bigram_counts, train_unigram_counts, bigram_counts, discount=0.75):
     kn_prob_func = build_kneser_ney_bigram_probs(train_bigram_counts, train_unigram_counts, discount=discount)
     bigram_probs_kn = {}
@@ -34,8 +33,6 @@ def print_kn_results(train_bigram_counts, train_unigram_counts, bigram_counts, d
         w1, w2 = bigram
         bigram_probs_kn[bigram] = kn_prob_func(w1, w2)
     print(f"Perplexity bigrams (KN): {perplexity(bigram_probs_kn, bigram_counts)}")
-
-
 
 def print_stupid_backoff_results(train_bigram_counts, train_unigram_counts, bigram_counts, alpha=0.4):
     sb_prob = build_stupid_backoff(train_bigram_counts, train_unigram_counts, alpha=alpha)
