@@ -8,6 +8,7 @@ from perplexity import perplexity
 from unk_handling import replace_rare_with_unk_tokenized, set_threshold, get_raw_counts, replace_oov_with_unk
 from smoothing import get_k_smoothing, build_k_smoothing
 from print_results import  print_stupid_backoff_results, print_no_smoothing_results, print_kn_results
+from print_results import print_perplexity_results,print_k_smoothing_results
 
 base_directory = "A1_DATASET/"
 
@@ -77,51 +78,37 @@ print_no_smoothing_results(test_bigram_counts, None, train_unigram_probs)
 print()
 
 ### Laplace Smoothing NO UNK version 
-print("Laplace Smoothing NO UNK version")
 k= 1
 train_unigram_probs_k_smoothing = build_k_smoothing(train_unigram_counts, k,vocabulary_size)
 train_bigram_probs_k_smoothing = build_k_smoothing(train_bigram_counts, k, vocabulary_size, train_unigram_counts)
 
-# print_laplace_smoothing_results(train_unigram_counts, vocabulary_size)
-
-print (f"Validation tokens not found in train")
-write_to_file(list(compare_dicts(train_unigram_counts,val_unigram_counts)),'not_found_unigrams.txt')
-write_to_file(list(compare_dicts(train_bigram_counts,val_bigram_counts)),'not_found_bigrams.txt')
-
-val_unigram_probs = get_k_smoothing(val_unigram_counts,k,vocabulary_size,train_unigram_counts,train_prob_vocab=train_unigram_probs_k_smoothing)
-val_bigram_probs = get_k_smoothing(val_bigram_counts,k,vocabulary_size,train_bigram_counts,train_unigram_counts,train_bigram_probs_k_smoothing)
-
-print (f"Perpelexity of validation set on unigrams is ", perplexity(val_unigram_probs, val_unigram_counts))
-print (f"Perpelexity of validation set on bigrams is ", perplexity(val_bigram_probs, val_bigram_counts))
-
-test_unigram_probs = get_k_smoothing(test_unigram_counts,k,vocabulary_size,train_unigram_counts,train_prob_vocab= train_unigram_probs)
-test_bigram_probs = get_k_smoothing(test_bigram_counts,k,vocabulary_size,train_bigram_counts,train_unigram_counts,train_bigram_probs)
-
-print (f"Perpelexity of test set on unigrams is ",perplexity(test_unigram_probs, test_unigram_counts))
-print (f"Perpelexity of test set on bigrams is ",perplexity(test_bigram_probs, test_bigram_counts))
+print("LAPLACE SMOOTHING RESULTS NO UNK")
+print("train results:")
+print_perplexity_results(train_unigram_probs_k_smoothing,train_unigram_counts)
+print_perplexity_results(train_bigram_probs_k_smoothing,train_bigram_counts)
+print("validation results:")
+print_k_smoothing_results(val_unigram_counts,k,vocabulary_size,train_unigram_counts,train_prob_vocab=train_unigram_probs_k_smoothing)
+print_k_smoothing_results(val_bigram_counts,k,vocabulary_size,train_bigram_counts,train_unigram_counts,train_bigram_probs_k_smoothing)
+print("test results:")
+print_k_smoothing_results(test_unigram_counts,k,vocabulary_size,train_unigram_counts,train_prob_vocab= train_unigram_probs_k_smoothing)
+print_k_smoothing_results(test_bigram_counts,k,vocabulary_size,train_bigram_counts,train_unigram_counts,train_bigram_probs_k_smoothing)
 
 ### K Smoothed version 
 print("K Smoothing no UNK version ")
 for k in [0.001,0.01,0.02,0.04,0.08,0.1,0.2,0.4,0.8,1]:
     print (f"For value of k ,{k}:")
     unigram_probs = build_k_smoothing(train_unigram_counts,k,vocabulary_size)
-    write_to_file(unigram_probs,"output_unigram_probs.txt",sort=True)
-
     bigram_probs = build_k_smoothing(train_bigram_counts,k,vocabulary_size,train_unigram_counts)
-    write_to_file(bigram_probs,"output_bigram_probs.txt",sort=True)
-
-    val_unigram_probs = get_k_smoothing(val_unigram_counts,k,vocabulary_size,train_unigram_counts,train_prob_vocab=unigram_probs)
-    val_bigram_probs = get_k_smoothing(val_bigram_counts,k,vocabulary_size,train_bigram_counts,train_unigram_counts,train_bigram_probs)
-
-    print (f"Perpelexity of validation set on unigrams is ",perplexity(val_unigram_probs,val_unigram_counts))
-    print (f"Perpelexity of validation set on bigrams is ",perplexity(val_bigram_probs,val_bigram_counts))
-
-    test_unigram_probs = get_k_smoothing(test_unigram_counts,k,vocabulary_size,train_unigram_counts,train_prob_vocab=unigram_probs)
-    test_bigram_probs = get_k_smoothing(test_bigram_counts,k,vocabulary_size,train_bigram_counts,train_unigram_counts,train_bigram_probs)
-
-    print (f"Perpelexity of test set on unigrams is ",perplexity(test_unigram_probs,test_unigram_counts))
-    print (f"Perpelexity of test set on bigrams is ",perplexity(test_bigram_probs,test_bigram_counts))
-print()
+    print (f"For k={k}:")
+    print("train results:")
+    print_perplexity_results(unigram_probs,train_unigram_counts)
+    print_perplexity_results(bigram_probs,train_bigram_counts)
+    print("validation results:")
+    print_k_smoothing_results(val_unigram_counts,k,vocabulary_size,train_unigram_counts,train_prob_vocab=unigram_probs)
+    print_k_smoothing_results(val_bigram_counts,k,vocabulary_size,train_bigram_counts,train_unigram_counts,bigram_probs)
+    print("test results:")
+    print_k_smoothing_results(test_unigram_counts,k,vocabulary_size,train_unigram_counts,train_prob_vocab= unigram_probs)
+    print_k_smoothing_results(test_bigram_counts,k,vocabulary_size,train_bigram_counts,train_unigram_counts,bigram_probs)
 
 ### Kneser-Ney Smoothing
 print("Kneser-Ney Smoothing no UNK version ")
