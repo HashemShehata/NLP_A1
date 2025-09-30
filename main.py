@@ -2,10 +2,10 @@ import os
 import random
 random.seed(42)
 
-from data_process import calculate_perplexity
 from ngram_calc import build_ngram, build_ngram_probabilities
 from data_tokenization import read_file,write_to_file, compare_dicts
 from perplexity import perplexity
+from unk_handling import replace_rare_with_unk_tokenized, replace_oov_with_unk
 from smoothing import build_kneser_ney_bigram_probs, build_stupid_backoff_bigram_probs, get_k_smoothing, build_k_smoothing
 base_directory = "A1_DATASET/"
 
