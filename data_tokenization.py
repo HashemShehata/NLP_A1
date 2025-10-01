@@ -1,5 +1,6 @@
 import nltk
 nltk.download('punkt_tab')
+import re
 from collections import Counter
 
 # --- Tokenization mode switch ---
@@ -21,6 +22,9 @@ def byte_tokenize(text, n):
     # For n-gram, treat each byte as a token (as int or as byte string)
     return [str(b) for b in text_bytes]
     
+def split_by_punct(text):
+    tokens = re.split(r'([.!?;:,\'’])', text)
+    return [t.strip() for t in tokens if t and not t.isspace()]
 
 def tokenize(text,n,tokenize_strategy="nltk",sentence_lower=True):
 
@@ -36,8 +40,11 @@ def tokenize(text,n,tokenize_strategy="nltk",sentence_lower=True):
         start_padding = max(1, n - 1)
         if tokenize_strategy=="nltk":
             tokens = nltk.word_tokenize(processed_sentence)
-        else:
+        elif tokenize_strategy=="whitespace":
             tokens=processed_sentence.split(" ")
+        else:
+            tokens=split_by_punct(processed_sentence)
+        
         final_tokens = start_sentence*start_padding + tokens + ['</s>']
         tokenized_sentences.extend(final_tokens)
     return tokenized_sentences
