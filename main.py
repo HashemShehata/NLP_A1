@@ -140,7 +140,7 @@ train_bigram_counts_unk = build_ngram_from_tokenized(train_tokenized_unk, 2)
 
 # 3. Final training vocab (after UNK replacement)
 train_vocab = set(token for (token,) in train_unigram_counts_unk.keys())
-
+vocabulary_size_unk = len(train_vocab)
 # 4. Tokenize val/test (unigrams only)
 val_tokenized_raw = [tokenize_switch(review, 1) for review in val_df]
 test_tokenized_raw = [tokenize_switch(review, 1) for review in test_df]
@@ -167,22 +167,61 @@ with open("output_bigram_counts_with_unk.txt", "w") as f:
     for item in sorted_bigram_counter:
         f.write(f"{item[0]}: {item[1]}\n")
 
+train_unigram_probs_unk = build_ngram_probabilities(train_unigram_counts_unk)
+write_to_file(train_unigram_probs_unk,"output_unigram_probs_unk.txt",sort=True)
+
+train_bigram_probs_unk = build_ngram_probabilities(train_bigram_counts_unk,train_unigram_counts_unk)
+write_to_file(train_bigram_probs_unk,"output_bigram_probs_unk.txt",sort=True)
+
 print("NO SMOOTHING RESULTS AFTER UNK HANDLING")
 print("train results:")
 print_no_smoothing_results(train_unigram_counts_unk)
 print_no_smoothing_results(train_bigram_counts_unk, train_unigram_counts_unk, None)
 print("validation results:")
-print_no_smoothing_results(val_unigram_counts_unk, None, train_unigram_counts_unk)
-print_no_smoothing_results(val_bigram_counts_unk, None, train_bigram_counts_unk)
+print_no_smoothing_results(val_unigram_counts_unk, None, train_unigram_probs_unk)
+print_no_smoothing_results(val_bigram_counts_unk, None, train_bigram_probs_unk)
 print("test results:")
-print_no_smoothing_results(test_unigram_counts_unk, None, train_unigram_counts_unk)
-print_no_smoothing_results(test_bigram_counts_unk, None, train_bigram_counts_unk)
+print_no_smoothing_results(test_unigram_counts_unk, None, train_unigram_probs_unk)
+print_no_smoothing_results(test_bigram_counts_unk, None, train_bigram_probs_unk)
 print()
 
 print("STUPID BACKOFF RESULTS AFTER UNK HANDLING")
 print_stupid_backoff_results(train_bigram_counts_unk, train_unigram_counts_unk, val_bigram_counts_unk, alpha=0.4)
 print_stupid_backoff_results(train_bigram_counts_unk, train_unigram_counts_unk, test_bigram_counts_unk, alpha=0.4)
 print()
+
+k= 1
+train_unigram_probs_k_smoothing_unk = build_k_smoothing(train_unigram_counts_unk, k, vocabulary_size_unk)
+train_bigram_probs_k_smoothing_unk = build_k_smoothing(train_bigram_counts_unk, k, vocabulary_size_unk, train_unigram_counts_unk)
+
+print("LAPLACE SMOOTHING RESULTS WITH UNK")
+print("train results:")
+print_perplexity_results(train_unigram_probs_k_smoothing_unk,train_unigram_counts_unk)
+print_perplexity_results(train_bigram_probs_k_smoothing_unk,train_bigram_counts_unk)
+print("validation results:")
+print_k_smoothing_results(val_unigram_counts_unk,k,vocabulary_size_unk,train_unigram_counts_unk,train_prob_vocab=train_unigram_probs_k_smoothing_unk)
+print_k_smoothing_results(val_bigram_counts_unk,k,vocabulary_size_unk,train_bigram_counts_unk,train_unigram_counts_unk,train_bigram_probs_k_smoothing_unk)
+print("test results:")
+print_k_smoothing_results(test_unigram_counts_unk,k,vocabulary_size_unk,train_unigram_counts_unk,train_prob_vocab= train_unigram_probs_k_smoothing_unk)
+print_k_smoothing_results(test_bigram_counts_unk,k,vocabulary_size_unk,train_bigram_counts_unk,train_unigram_counts_unk,train_bigram_probs_k_smoothing_unk)
+
+### K Smoothed version 
+print("K Smoothing with UNK version ")
+for k in [0.001,0.01,0.02,0.04,0.08,0.1,0.2,0.4,0.8,1]:
+    print (f"For value of k ,{k}:")
+    train_unigram_probs_unk = build_k_smoothing(train_unigram_counts_unk,k,vocabulary_size_unk)
+    train_bigram_probs_unk = build_k_smoothing(train_bigram_counts_unk,k,vocabulary_size_unk,train_unigram_counts_unk)
+    print (f"For k={k}:")
+    print("train results:")
+    print_perplexity_results(train_unigram_probs_unk,train_unigram_counts_unk)
+    print_perplexity_results(train_bigram_probs_unk,train_bigram_counts_unk)
+    print("validation results:")
+    print_k_smoothing_results(val_unigram_counts_unk,k,vocabulary_size_unk,train_unigram_counts_unk,train_prob_vocab=train_unigram_probs_unk)
+    print_k_smoothing_results(val_bigram_counts_unk,k,vocabulary_size_unk,train_bigram_counts_unk,train_unigram_counts_unk,train_bigram_probs_unk)
+    print("test results:")
+    print_k_smoothing_results(test_unigram_counts_unk,k,vocabulary_size_unk,train_unigram_counts_unk,train_prob_vocab= train_unigram_probs_unk)
+    print_k_smoothing_results(test_bigram_counts_unk,k,vocabulary_size_unk,train_bigram_counts_unk,train_unigram_counts_unk,train_bigram_probs_unk)
+
 
 print("Kneser-Ney Smoothing AFTER UNK HANDLING")
 print("validation results:")
