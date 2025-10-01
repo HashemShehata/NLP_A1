@@ -1,10 +1,10 @@
 import math
 
-def perplexity(train_probs, test_tokens_count):
+def perplexity(probs, tokens_count):
     total_counts = 0
     logsum = 0
-    for test_token, count in test_tokens_count.items():
-        prob = train_probs.get(test_token)
+    for test_token, count in tokens_count.items():
+        prob = probs.get(test_token)
         if prob <= 0:
             print (f"Test tokens are:",test_token)
             return float('inf')
