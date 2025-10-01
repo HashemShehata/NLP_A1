@@ -1,6 +1,0 @@
-the cat sat on the mat .
-the dog chased the cat .
-the cat chased the dog .
-dogs and cats are friends .
-the mat was sat on by the cat .
-friends of the cat and the dog .
