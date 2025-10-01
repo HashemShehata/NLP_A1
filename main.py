@@ -186,7 +186,11 @@ print_no_smoothing_results(test_bigram_counts_unk, None, train_bigram_probs_unk)
 print()
 
 print("STUPID BACKOFF RESULTS AFTER UNK HANDLING")
+print("train results:")
+print_stupid_backoff_results(train_bigram_counts_unk, train_unigram_counts_unk, train_bigram_counts_unk, alpha=0.4)
+print("validation results:")
 print_stupid_backoff_results(train_bigram_counts_unk, train_unigram_counts_unk, val_bigram_counts_unk, alpha=0.4)
+print("test results:")
 print_stupid_backoff_results(train_bigram_counts_unk, train_unigram_counts_unk, test_bigram_counts_unk, alpha=0.4)
 print()
 
@@ -224,6 +228,8 @@ for k in [0.001,0.01,0.02,0.04,0.08,0.1,0.2,0.4,0.8,1]:
 
 
 print("Kneser-Ney Smoothing AFTER UNK HANDLING")
+print("train results:")
+print_kn_results(train_bigram_counts_unk, train_unigram_counts_unk, train_bigram_counts_unk, discount=0.75)
 print("validation results:")
 print_kn_results(train_bigram_counts_unk, train_unigram_counts_unk, val_bigram_counts_unk, discount=0.75)
 print("test results:")

@@ -30,4 +30,4 @@ def print_stupid_backoff_results(train_bigram_counts, train_unigram_counts, bigr
     eval_bigram_probs = {bg: sb_prob(bg[0], bg[1]) for bg in bigram_counts.keys()}
 
     perp = perplexity(eval_bigram_probs, bigram_counts)
-    print(f"Perplexity of validation set on bigrams (SB, alpha={alpha}): {perp}")
+    print(f"Perplexity on bigrams (SB, alpha={alpha}): {perp}")
