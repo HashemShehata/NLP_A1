@@ -22,19 +22,24 @@ def byte_tokenize(text, n):
     return [str(b) for b in text_bytes]
     
 
-def tokenize(text,n):
+def tokenize(text,n,tokenize_strategy="nltk",sentence_lower=True):
 
     sentences = nltk.sent_tokenize(text)
     start_sentence = ['<s>']
     tokenized_sentences = []
 
     for sentence in sentences:
-        processed_sentence = sentence.lower()
+        if sentence_lower:
+            processed_sentence = sentence.lower()
+        else:
+            processed_sentence = sentence
         start_padding = max(1, n - 1)
-        tokens = nltk.word_tokenize(processed_sentence)
+        if tokenize_strategy=="nltk":
+            tokens = nltk.word_tokenize(processed_sentence)
+        else:
+            tokens=processed_sentence.split(" ")
         final_tokens = start_sentence*start_padding + tokens + ['</s>']
         tokenized_sentences.extend(final_tokens)
-
     return tokenized_sentences
 
 def tokenize_switch(text, n):
