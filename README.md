@@ -1,28 +1,28 @@
-Requirements:
+# NLP N-gram Language Modeling
+
+### Requirements:
+```
 pip install nltk
+```
 
-Execution:
+### Running the code
+```
 python main.py
+```
 
-data_tokenization.py:
-Contains different modes of tokenization that can be used. Also contain read and write file functions
+### Project Structure
 
-ngram_calc.py:
-Contains computation of ngrams and ngram probabilites
+- data_tokenization.py — Tokenization modes (word / whitespace / punct / nltk) plus file read/write operations.
 
-perplexity.py:
-Computes perplexity scores
+- ngram_calc.py — N-gram counting and n-gram probability computation.
 
-smoothing.py
-Contains different modes of smoothing techniques that can be used. 
+- perplexity.py — Perplexity calculation utilities.
 
-unk_handling.py
-Contains functions to handle UNK's
+- smoothing.py — Implementations of smoothing techniques (e.g., add-k/Laplace, Kneser–Ney, backoff/interpolation).
 
-print_results.py
-Contains funcationaly to print various results that we have tried and tested
+- unk_handling.py — Functions to build train vocab and map OOVs to <unk>.
 
-
+- print_results.py — Helpers to format and print experiment results.
 
 
 
