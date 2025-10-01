@@ -114,10 +114,20 @@ for k in [0.001,0.01,0.02,0.04,0.08,0.1,0.2,0.4,0.8,1]:
 print("Kneser-Ney Smoothing no UNK version ")
 
 # Build KN probability function for training data
+print("train results:")
+print_kn_results(train_bigram_counts, train_unigram_counts, train_bigram_counts, discount=0.75)
 print("validation results:")
 print_kn_results(train_bigram_counts, train_unigram_counts, val_bigram_counts, discount=0.75)
 print("test results:")
 print_kn_results(train_bigram_counts, train_unigram_counts, test_bigram_counts, discount=0.75)
+
+print("STUPID BACKOFF RESULTS NO UNK")
+print("train results:")
+print_stupid_backoff_results(train_bigram_counts, train_unigram_counts, train_bigram_counts, alpha=0.4)
+print("validation results:")
+print_stupid_backoff_results(train_bigram_counts, train_unigram_counts, val_bigram_counts, alpha=0.4)
+print("test results:")
+print_stupid_backoff_results(train_bigram_counts, train_unigram_counts, test_bigram_counts, alpha=0.4)
 
 print("************************EVERYTHING BELOW IS WITH UNK HANDLING********************")
 print()
