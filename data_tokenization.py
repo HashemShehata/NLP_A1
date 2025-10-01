@@ -32,8 +32,11 @@ def tokenize(text,n,tokenize_strategy="nltk",sentence_lower=True):
     if tokenize_strategy=='whitespace' and sentence_lower:
         return text.lower().split()
     if tokenize_strategy=='whitespace_punct' and sentence_lower:
-        return split_by_punct(text.lower())
-    
+        tokenized_sentences = []
+        punct_split= split_by_punct(text.lower())
+        for punc in punct_split:
+            tokenized_sentences.extend(punc.split())
+        return tokenized_sentences
     sentences = nltk.sent_tokenize(text)
     start_sentence = ['<s>']
     tokenized_sentences = []
@@ -44,7 +47,7 @@ def tokenize(text,n,tokenize_strategy="nltk",sentence_lower=True):
         tokens = nltk.word_tokenize(processed_sentence)
         final_tokens = start_sentence*start_padding + tokens + ['</s>']
         tokenized_sentences.extend(final_tokens)
-        
+
     return tokenized_sentences
 
 def tokenize_switch(text, n):
