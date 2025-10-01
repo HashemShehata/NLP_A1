@@ -71,10 +71,10 @@ print_no_smoothing_results(train_unigram_counts)
 print_no_smoothing_results(train_bigram_counts, train_unigram_counts, None)
 print("validation results:")
 print_no_smoothing_results(val_unigram_counts, None, train_unigram_probs)
-print_no_smoothing_results(val_bigram_counts, None, train_unigram_probs)
+print_no_smoothing_results(val_bigram_counts, None, train_bigram_probs)
 print("test results:")
 print_no_smoothing_results(test_unigram_counts, None, train_unigram_probs)
-print_no_smoothing_results(test_bigram_counts, None, train_unigram_probs)
+print_no_smoothing_results(test_bigram_counts, None, train_bigram_probs)
 print()
 
 ### Laplace Smoothing NO UNK version 
